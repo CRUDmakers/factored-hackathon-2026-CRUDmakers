@@ -1,0 +1,10 @@
+# Secrets — never commit AWS credentials
+.env
+
+# Local copies of the datathon data
+# data/
+
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
