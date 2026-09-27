@@ -1,2 +1,82 @@
-data/
+/data/
+
+# ---------- Env / secrets ----------
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------- OS / editors ----------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*~
+
+# ---------- Logs ----------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================================
+# Node (front + back)
+# ============================================================
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+dist-ssr/
+build/
+*.local
+
+# Vite
+.vite/
+vite.config.*.timestamp-*
+
+# ============================================================
+# Python (ai)
+# ============================================================
+__pycache__/
+*.py[cod]
+*.so
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.ipynb_checkpoints/
+
+# ML artifacts (models, caches, experiment tracking)
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.joblib
+*.pkl
+mlruns/
+wandb/
+.cache/
