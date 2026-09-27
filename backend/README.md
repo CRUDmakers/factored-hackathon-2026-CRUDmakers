@@ -37,7 +37,10 @@ npx prisma migrate deploy      # banco em DATABASE_URL (padrão: localhost:5432/
 npm run etl:dev                # carrega ../data
 npm run dev                    # API com reload
 npm run test:coverage          # usa TEST_DATABASE_URL (padrão: localhost:5432/banking_test)
+npm run studio                 # Prisma Studio em http://localhost:5555 para navegar no banco
 ```
+
+O Studio usa o `DATABASE_URL`. Com o Postgres do `docker compose`, o padrão (`localhost:5432/banking`) já funciona. Para abrir outro banco, passe a URL: `npm run studio -- --url postgresql://banking:banking@localhost:5432/banking_test`.
 
 | Variável | Padrão | Uso |
 |---|---|---|

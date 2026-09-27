@@ -14,6 +14,7 @@
     "start": "node dist/main.js",
     "dev": "tsx watch src/main.ts",
     "migrate": "prisma migrate deploy",
+    "studio": "prisma studio --port 5555",
     "etl": "node dist/etl/cli.js",
     "etl:dev": "tsx src/etl/cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
