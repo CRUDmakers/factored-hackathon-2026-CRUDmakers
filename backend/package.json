@@ -6,18 +6,18 @@
   "type": "module",
   "main": "dist/main.js",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.9"
   },
   "scripts": {
     "generate": "prisma generate",
     "build": "prisma generate && tsc -p tsconfig.build.json",
-    "start": "node dist/main.js",
-    "dev": "tsx watch src/main.ts",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "dev": "tsx --env-file-if-exists=.env watch src/main.ts",
     "migrate": "prisma migrate deploy",
     "studio": "prisma studio --port 5555",
-    "etl": "node dist/etl/cli.js",
-    "etl:dev": "tsx src/etl/cli.ts",
-    "db:reset": "prisma migrate deploy && tsx src/etl/cli.ts --force",
+    "etl": "node --env-file-if-exists=.env dist/etl/cli.js",
+    "etl:dev": "tsx --env-file-if-exists=.env src/etl/cli.ts",
+    "db:reset": "prisma migrate deploy && tsx --env-file-if-exists=.env src/etl/cli.ts --force",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
