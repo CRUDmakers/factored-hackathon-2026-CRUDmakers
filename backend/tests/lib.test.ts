@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isoDay, maskNumber, round2, toBankCountry } from '../src/lib/domain.js';
+import { displayNumber, isoDay, maskNumber, round2, toBankCountry } from '../src/lib/domain.js';
 import { AppError, notFound, unprocessable } from '../src/lib/errors.js';
 import { newId } from '../src/lib/ids.js';
 import { explainStatus } from '../src/lib/responseCodes.js';
@@ -21,6 +21,8 @@ describe('domain', () => {
     expect(round2(1.005)).toBe(1.01);
     expect(maskNumber('4332181960')).toBe('•••• 1960');
     expect(maskNumber(null)).toBeNull();
+    expect(displayNumber('Tarjeta Crédito', '4672423884969653')).toBe('•••• 9653');
+    expect(displayNumber('Cuenta Corriente', '4332181960')).toBe('4332181960');
     expect(isoDay(new Date('2025-08-11T00:00:00Z'))).toBe('2025-08-11');
     expect(isoDay(null)).toBeNull();
   });

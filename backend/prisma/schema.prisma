@@ -174,3 +174,14 @@ model ScheduledPayment {
   @@index([status, next_run_at])
   @@map("scheduled_payments")
 }
+
+// Sessões de teste revogadas (logout). Só guarda o jti até o token expirar.
+model RevokedSession {
+  jti         String   @id
+  customer_id String
+  expires_at  DateTime @db.Timestamptz(6)
+  revoked_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([expires_at])
+  @@map("revoked_sessions")
+}

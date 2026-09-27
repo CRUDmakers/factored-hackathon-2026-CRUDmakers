@@ -49,9 +49,11 @@ export const scheduledRoutes: FastifyPluginAsyncTypebox = async (app) => {
   });
 
   app.post('/scheduled-payments/run', {
+    config: { auth: 'service' },
     schema: {
       tags: ['Agendamentos'],
       summary: 'Executa agora os agendamentos vencidos (o executor já faz isso periodicamente)',
+      description: 'Operação interna: exige a chave de serviço no header x-service-key.',
     },
     handler: async () => ({ executed: await runDueSchedules() }),
   });

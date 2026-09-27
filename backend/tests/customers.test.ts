@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ANA, DIEGO, UNKNOWN, resetData, testApp } from './helpers.js';
+import { ANA, DIEGO, UNKNOWN, ownerApp, resetData } from './helpers.js';
 
 let app: FastifyInstance;
 beforeAll(async () => {
   await resetData();
-  app = await testApp();
+  app = await ownerApp();
 });
 afterAll(() => app.close());
 
@@ -36,7 +36,7 @@ describe('GET /api/customers/:id/balances (feature 1)', () => {
     // Produtos fechados ficam de fora.
     expect(body.accounts.map((a: { product_id: string }) => a.product_id)).not.toContain('PRD-ANACLOSED008');
     expect(body.accounts).toContainEqual(
-      expect.objectContaining({ product_id: 'PRD-ANACHK000001', balance: 1000, product_number: '•••• 3456' }),
+      expect.objectContaining({ product_id: 'PRD-ANACHK000001', balance: 1000, product_number: '4000000001' }),
     );
 
     const card = body.credit_cards.find((c: { product_id: string }) => c.product_id === 'PRD-ANACC0000003');

@@ -53,6 +53,14 @@ export function maskNumber(value: string | null): string | null {
   return value ? `•••• ${value.slice(-4)}` : null;
 }
 
+/**
+ * Número exibido ao dono do produto: cartões ficam mascarados (é o número do cartão);
+ * contas e demais produtos aparecem completos, para o cliente poder informá-los a quem vai lhe transferir.
+ */
+export function displayNumber(productType: string, value: string | null): string | null {
+  return CARD_PRODUCTS.includes(productType) ? maskNumber(value) : value;
+}
+
 /** Date -> "YYYY-MM-DD" (colunas DATE do Postgres). */
 export function isoDay(value: Date | null): string | null {
   return value ? value.toISOString().slice(0, 10) : null;

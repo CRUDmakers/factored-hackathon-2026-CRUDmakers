@@ -73,7 +73,12 @@ export const Beneficiary = Type.Object({
 });
 
 const TransferDestination = Type.Object({
-  to_product_id: Type.Optional(Type.String({ description: 'Conta/cartão/empréstimo de destino no próprio banco' })),
+  to_account_number: Type.Optional(
+    Type.String({ minLength: 1, description: 'Número da conta corrente/poupança de outra pessoa no Banco LATAM (transferência entre pessoas)' }),
+  ),
+  to_product_id: Type.Optional(
+    Type.String({ description: 'ID interno de um produto no banco (ex.: pagar a fatura do próprio cartão ou o empréstimo)' }),
+  ),
   beneficiary: Type.Optional(Beneficiary),
 });
 const PixDestination = Type.Object({

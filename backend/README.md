@@ -3,7 +3,8 @@
 API em **Fastify + TypeScript + Prisma (PostgreSQL)** que lê os dados do datathon e simula operações bancárias para o assistente de atendimento (Backend 2) e o frontend.
 
 - Swagger UI: `http://localhost:3000/docs` (OpenAPI JSON em `/docs/json`)
-- CORS liberado para qualquer origem, método e header
+- CORS liberado para qualquer origem, método e header (inclusive `Authorization` e `x-service-key`)
+- Dados de cliente só com sessão: `Authorization: Bearer <token>` do próprio cliente (veja [Autenticação](#autenticação))
 - Testes com 100% de cobertura (statements, branches, funções e linhas), rodando contra um Postgres real
 
 ## Como rodar (Docker)
@@ -50,10 +51,49 @@ O Studio usa o `DATABASE_URL`. Com o Postgres do `docker compose`, o padrão (`l
 | `PORT` / `HOST` | `3000` / `0.0.0.0` | servidor HTTP |
 | `SCHEDULER_INTERVAL_MS` | `60000` | intervalo do executor de agendamentos |
 | `LOG_LEVEL` | `info` | nível de log |
+| `AUTH_JWT_SECRET` | só fora de produção: `dev-only-jwt-secret-troque-em-producao` | segredo HMAC (HS256) dos tokens de sessão |
+| `AUTH_SERVICE_KEY` | só fora de produção: `dev-service-key` | chave do provedor de identidade de teste e das operações internas (header `x-service-key`) |
+| `AUTH_SESSION_TTL_SECONDS` | `900` (15 min) | validade do token de sessão |
+
+Com `NODE_ENV=production` (caso da imagem Docker) não há valor padrão para `AUTH_JWT_SECRET` e `AUTH_SERVICE_KEY`: a API não sobe sem eles. O `docker-compose.yml` passa valores de demo, que podem ser sobrescritos por variáveis de ambiente ou por um `.env` na raiz.
+
+## Autenticação
+
+> **Serviço de identidade simulado.** Não existe login real (senha, OTP, biometria). `POST /auth/test-sessions` faz o papel de um provedor de identidade confiável: quem tem a chave de serviço (o frontend/demo) afirma que já verificou o cliente, e a API emite a sessão. Um número de documento ou `customer_id` sozinho não prova identidade; o que dá acesso é o token assinado.
+
+1. O frontend/demo pede uma sessão para um cliente ativo, com a chave de serviço:
+
+   ```bash
+   curl -s -X POST http://localhost:3000/auth/test-sessions      -H "x-service-key: demo-service-key" -H "content-type: application/json"      -d '{"customer_id":"CLI-G4X2AMVD62NR"}'
+   # {"access_token":"eyJ...","token_type":"Bearer","expires_in":900,"expires_at":"...","session_id":"...","customer_id":"CLI-G4X2AMVD62NR"}
+   ```
+
+   (`demo-service-key` é o valor do `docker-compose.yml`; rodando com `npm run dev`, o padrão é `dev-service-key`.)
+
+2. Chamadas a `/api/customers/{customerId}/…` levam o token, e só funcionam para o próprio cliente:
+
+   ```bash
+   curl -s http://localhost:3000/api/customers/CLI-G4X2AMVD62NR/balances -H "Authorization: Bearer eyJ..."
+   ```
+
+3. `GET /auth/sessions/current` mostra cliente e expiração da sessão; `DELETE /auth/sessions/current` encerra a sessão (logout).
+
+O token é um JWT HS256 com `iss = banking-cs-test-idp`, `sub = customer_id`, `jti` (id da sessão) e `exp` curto. A checagem é central (`src/auth.ts`): um hook `onRequest` protege toda rota em `/api/customers/…` antes da validação e do handler, e as rotas de sessão/serviço declaram o modo em `config.auth`. O logout grava o `jti` em `revoked_sessions` até o token expirar. A emissão é recusada para cliente inexistente (404) ou com `customer_status` diferente de `Active` (403).
+
+| Situação | Status | `error` |
+|---|---|---|
+| Sem `Authorization`, formato errado, token malformado, assinatura/emissor/algoritmo inválidos | 401 | `unauthorized` |
+| Token expirado | 401 | `session_expired` |
+| Sessão encerrada por logout | 401 | `session_revoked` |
+| Token de um cliente acessando outro `customerId` (exista ele ou não) | 403 | `forbidden` |
+| Chave de serviço ausente ou errada (`/auth/test-sessions`, `/api/scheduled-payments/run`) | 401 | `unauthorized` |
+| Emissão para cliente inativo | 403 | `customer_inactive` |
+
+Continuam públicos: `/health`, `/api/reference`, `/api/exchange-rates/*` e `/docs`. `POST /api/scheduled-payments/run` é operação interna e exige `x-service-key`. No Swagger, use o botão **Authorize** (esquemas `bearerAuth` e `serviceKey`).
 
 ## Endpoints por feature
 
-Todos os endpoints de cliente ficam em `/api/customers/{customerId}/…`.
+Todos os endpoints de cliente ficam em `/api/customers/{customerId}/…` e exigem a sessão do próprio cliente.
 
 | Feature | Endpoint |
 |---|---|
@@ -70,7 +110,7 @@ Todos os endpoints de cliente ficam em `/api/customers/{customerId}/…`.
 | 9. Ajuste no empréstimo | `GET /adjustments` |
 | 10. Vencimento do cartão e taxa de juros | `GET /products`, `GET /products/{id}` |
 
-Também há `GET /health`, `GET /api/reference` (países, moedas e códigos de resposta) e `POST /api/scheduled-payments/run`, que executa na hora os agendamentos vencidos.
+Também há `GET /health`, `GET /api/reference` (países, moedas e códigos de resposta) e `POST /api/scheduled-payments/run` (exige `x-service-key`), que executa na hora os agendamentos vencidos.
 
 ## Regras da simulação
 
@@ -90,6 +130,7 @@ Também há `GET /health`, `GET /api/reference` (países, moedas e códigos de r
 prisma/            schema e migrações
 src/
   app.ts           Fastify, CORS, Swagger, tratamento de erros
+  auth.ts          checagem central de sessão/chave de serviço (hooks onRoute + onRequest)
   main.ts          ponto de entrada (servidor + executor de agendamentos)
   db/prisma.ts     Prisma Client (adapter pg) e pool compartilhado
   etl/             carga dos CSVs via COPY

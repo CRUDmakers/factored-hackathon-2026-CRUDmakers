@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { resolvePeriod } from '../src/services/transactions.js';
-import { ANA, BRUNO, DIEGO, UNKNOWN, resetData, testApp } from './helpers.js';
+import { ANA, BRUNO, DIEGO, UNKNOWN, ownerApp, resetData } from './helpers.js';
 
 let app: FastifyInstance;
 beforeAll(async () => {
   await resetData();
-  app = await testApp();
+  app = await ownerApp();
 });
 afterAll(() => app.close());
 

@@ -3,7 +3,10 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import type { TypeBoxTypeProvider } from '@fastify/type-provider-typebox';
 import Fastify, { type FastifyError, type FastifyServerOptions } from 'fastify';
+import { registerAuth, securitySchemes } from './auth.js';
+import { config } from './config.js';
 import { AppError } from './lib/errors.js';
+import { authRoutes } from './routes/auth.js';
 import { customerRoutes } from './routes/customers.js';
 import { exchangeRoutes } from './routes/exchange.js';
 import { metaRoutes } from './routes/meta.js';
@@ -12,12 +15,18 @@ import { scheduledRoutes } from './routes/scheduled.js';
 import { transactionRoutes } from './routes/transactions.js';
 
 export async function buildApp(options: FastifyServerOptions = {}) {
+  // Em produção não há segredo padrão: sem eles a API não sobe.
+  if (!config.authJwtSecret || !config.authServiceKey) {
+    throw new Error('Defina AUTH_JWT_SECRET e AUTH_SERVICE_KEY (obrigatórios em produção).');
+  }
+
   const app = Fastify({
     ...options,
     ajv: { customOptions: { coerceTypes: 'array', removeAdditional: false } },
   }).withTypeProvider<TypeBoxTypeProvider>();
 
-  // CORS totalmente liberado: qualquer origem (refletida, então funciona com credentials), método e header.
+  // CORS totalmente liberado: qualquer origem (refletida, então funciona com credentials), método e header
+  // (os headers pedidos no preflight, como Authorization e x-service-key, são refletidos).
   await app.register(cors, {
     origin: true,
     credentials: true,
@@ -35,6 +44,9 @@ export async function buildApp(options: FastifyServerOptions = {}) {
     }
   });
 
+  // Antes do Swagger e das rotas: o onRoute marca a segurança de cada rota e o onRequest faz a checagem.
+  registerAuth(app);
+
   await app.register(swagger, {
     openapi: {
       info: {
@@ -44,7 +56,9 @@ export async function buildApp(options: FastifyServerOptions = {}) {
           'para o assistente de atendimento. Clientes, produtos e transações vêm do dataset do Factored Datathon 2026.',
         version: '1.0.0',
       },
+      components: { securitySchemes },
       tags: [
+        { name: 'Autenticação', description: 'Serviço de identidade de TESTE (simulado), não é login real' },
         { name: 'Clientes' },
         { name: 'Produtos' },
         { name: 'Transações' },
@@ -74,6 +88,7 @@ export async function buildApp(options: FastifyServerOptions = {}) {
   });
 
   await app.register(metaRoutes);
+  await app.register(authRoutes);
   for (const routes of [customerRoutes, transactionRoutes, paymentRoutes, scheduledRoutes, exchangeRoutes]) {
     await app.register(routes, { prefix: '/api' });
   }

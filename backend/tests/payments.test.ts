@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/db/prisma.js';
-import { ANA, BARCODE, BRUNO, CARLA, UNKNOWN, balanceOf, resetData, testApp } from './helpers.js';
+import { ANA, BARCODE, BRUNO, CARLA, UNKNOWN, balanceOf, ownerApp, resetData } from './helpers.js';
 
 let app: FastifyInstance;
 beforeAll(async () => {
-  app = await testApp();
+  app = await ownerApp();
 });
 beforeEach(resetData);
 afterAll(() => app.close());
@@ -55,6 +55,41 @@ describe('transferências (feature 2)', () => {
     expect(credit.amount_usd?.toNumber()).toBe(50);
   });
 
+  it('transfere de pessoa para pessoa pelo número da conta', async () => {
+    const body = (await post('transfers', { source_product_id: CHK, amount: 50, to_account_number: '5000-000 001' })).json();
+    expect(body).toMatchObject({
+      completed: true,
+      transaction_type: 'Transfer',
+      counterparty: { type: 'internal', to_product_id: 'PRD-BRUCHK000001', to_account_number: '5000000001', recipient_name: 'Bruno Gómez', own_product: false },
+      credited: { amount: 200000, currency: 'COP' },
+    });
+    expect(await balanceOf('PRD-BRUCHK000001')).toBe(2200000);
+  });
+
+  it.each([
+    ['conta inexistente', '999', 'Conta de destino não encontrada.'],
+    ['número repetido no dataset', '1234567890123456', 'Número de conta ambíguo: mais de uma conta com esse número.'],
+    ['conta suspensa', '5000000002', 'A conta de destino está com status Suspended.'],
+  ])('recusa pelo número da conta: %s', async (_, number, detail) => {
+    const body = (await post('transfers', { source_product_id: CHK, amount: 10, to_account_number: number })).json();
+    expect(body).toMatchObject({ status: 'Declined', response_code: '14', decline_detail: detail });
+    expect(await balanceOf(CHK)).toBe(1000);
+  });
+
+  it('número da conta não aponta para investimento nem para a própria conta de origem', async () => {
+    const investment = await post('transfers', { source_product_id: CHK, amount: 10, to_account_number: '6000000002' });
+    expect(investment.json()).toMatchObject({ status: 'Declined', decline_detail: 'Conta de destino não encontrada.' });
+    const self = await post('transfers', { source_product_id: CHK, amount: 10, to_account_number: '4000000001' });
+    expect(self.statusCode).toBe(422);
+    expect(self.json().message).toBe('O produto de origem e o de destino são iguais.');
+  });
+
+  it('paga cartão sem número registrado pelo ID do produto', async () => {
+    const body = (await post('transfers', { source_product_id: CHK, amount: 10, to_product_id: 'PRD-ANACCZERO010' })).json();
+    expect(body).toMatchObject({ completed: true, counterparty: { to_account_number: null } });
+    expect(await balanceOf('PRD-ANACCZERO010')).toBe(-10);
+  });
+
   it('transfere para produto sem dono conhecido e sem saldo registrado', async () => {
     const body = (await post('transfers', { source_product_id: CHK, amount: 10, to_product_id: 'PRD-ORPHAN000001' })).json();
     expect(body).toMatchObject({ completed: true, counterparty: { recipient_name: null, international: false } });
@@ -99,7 +134,8 @@ describe('transferências (feature 2)', () => {
 
   it.each([
     ['sem destino', {}],
-    ['com os dois destinos', { to_product_id: 'PRD-BRUCHK000001', beneficiary: { name: 'X', account_number: '1', country: 'MX' } }],
+    ['com dois destinos', { to_product_id: 'PRD-BRUCHK000001', beneficiary: { name: 'X', account_number: '1', country: 'MX' } }],
+    ['com conta e produto', { to_product_id: 'PRD-BRUCHK000001', to_account_number: '5000000001' }],
     ['para o mesmo produto', { to_product_id: CHK }],
     ['para investimento', { to_product_id: 'PRD-CARINV000002' }],
   ])('destino inválido (%s) retorna 422 sem gravar', async (_, destination) => {

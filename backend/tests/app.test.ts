@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { start } from '../src/server.js';
-import { resetData, testApp } from './helpers.js';
+import { ANA, SERVICE, bearer, resetData, testApp } from './helpers.js';
 
 beforeAll(resetData);
 
@@ -61,7 +61,7 @@ describe('app', () => {
     const empty = await app.inject({
       method: 'POST',
       url: '/api/scheduled-payments/run',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...SERVICE },
       payload: '',
     });
     expect(empty.statusCode).toBe(200);
@@ -70,7 +70,7 @@ describe('app', () => {
     const broken = await app.inject({
       method: 'POST',
       url: '/api/scheduled-payments/run',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...SERVICE },
       payload: '{nope',
     });
     expect(broken.statusCode).toBe(400);
@@ -82,8 +82,8 @@ describe('app', () => {
     const app = await testApp();
     const res = await app.inject({
       method: 'POST',
-      url: '/api/customers/CLI-ANA000000001/pix',
-      headers: { 'content-type': 'text/xml' },
+      url: `/api/customers/${ANA}/pix`,
+      headers: { 'content-type': 'text/xml', ...bearer(ANA) },
       payload: '<x/>',
     });
     expect(res.statusCode).toBe(415);

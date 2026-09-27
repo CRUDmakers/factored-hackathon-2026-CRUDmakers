@@ -29,8 +29,10 @@ export interface Beneficiary {
 }
 
 export interface Destination {
-  /** transfer: produto de destino no próprio banco (de qualquer cliente). */
+  /** transfer: produto de destino no próprio banco pelo ID interno (ex.: pagar a fatura do próprio cartão). */
   to_product_id?: string;
+  /** transfer: número da conta corrente/poupança de outra pessoa no próprio banco. */
+  to_account_number?: string;
   /** transfer: conta em outro banco. */
   beneficiary?: Beneficiary;
   /** pix: e-mail, celular ou documento do destinatário. */
@@ -75,8 +77,11 @@ export async function validateRequest(db: Db, req: PaymentRequest): Promise<{ so
 
   const d = req.destination;
   if (req.method === 'transfer') {
-    if (!d.to_product_id === !d.beneficiary) {
-      throw unprocessable('invalid_destination', 'Informe to_product_id (conta no banco) OU beneficiary (outro banco).');
+    if ([d.to_product_id, d.to_account_number, d.beneficiary].filter(Boolean).length !== 1) {
+      throw unprocessable(
+        'invalid_destination',
+        'Informe um destino: to_account_number (conta de outra pessoa no banco), to_product_id (produto no banco) ou beneficiary (outro banco).',
+      );
     }
     if (d.to_product_id === source.product_id) {
       throw unprocessable('invalid_destination', 'O produto de origem e o de destino são iguais.');
@@ -186,10 +191,29 @@ async function resolveDestination(tx: Prisma.TransactionClient, req: PaymentRequ
     };
   }
 
-  const productId = d.to_product_id!;
+  let productId = d.to_product_id;
+  if (d.to_account_number) {
+    const number = d.to_account_number.replace(/[\s.-]/g, '');
+    const matches = await tx.product.findMany({
+      where: { product_number: number, product_type: { in: [PRODUCT_TYPES.checking, PRODUCT_TYPES.savings] } },
+      select: { product_id: true },
+      take: 2,
+    });
+    const counterparty = { type: 'internal', to_account_number: number };
+    if (matches.length !== 1) {
+      // O dataset tem números de conta repetidos; na dúvida não se credita ninguém.
+      const detail = matches.length ? 'Número de conta ambíguo: mais de uma conta com esse número.' : 'Conta de destino não encontrada.';
+      return { product: null, country: null, counterparty, decline: { code: '14', detail } };
+    }
+    productId = matches[0].product_id;
+    if (productId === req.sourceProductId) {
+      throw unprocessable('invalid_destination', 'O produto de origem e o de destino são iguais.');
+    }
+  }
+  productId = productId!;
   await lockProducts(tx, [productId]);
   const dest = await tx.product.findUnique({ where: { product_id: productId } });
-  const counterparty = { type: 'internal', to_product_id: productId };
+  const counterparty = { type: 'internal', to_product_id: productId, to_account_number: dest?.product_number ?? null };
   if (!dest) {
     return { product: null, country: null, counterparty, decline: { code: '14', detail: 'Conta de destino não encontrada.' } };
   }

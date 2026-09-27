@@ -1,6 +1,6 @@
 import { Decimal, prisma, type Db } from '../db/prisma.js';
 import type { Product } from '../generated/prisma/client.js';
-import { DEBT_PRODUCTS, FUNDS_PRODUCTS, LOAN_PRODUCTS, PRODUCT_TYPES, isoDay, maskNumber, round2, today } from '../lib/domain.js';
+import { DEBT_PRODUCTS, FUNDS_PRODUCTS, LOAN_PRODUCTS, PRODUCT_TYPES, displayNumber, isoDay, maskNumber, round2, today } from '../lib/domain.js';
 import { notFound } from '../lib/errors.js';
 import { getRate } from './exchange.js';
 
@@ -28,7 +28,7 @@ export function presentProduct(p: Product) {
   return {
     product_id: p.product_id,
     product_type: p.product_type,
-    product_number: maskNumber(p.product_number),
+    product_number: displayNumber(p.product_type, p.product_number),
     currency: p.currency,
     status: p.product_status,
     current_balance: p.current_balance,
@@ -66,7 +66,7 @@ export async function getBalances(customerId: string) {
   const accounts = ofType(FUNDS_PRODUCTS).map((p) => ({
     product_id: p.product_id,
     product_type: p.product_type,
-    product_number: maskNumber(p.product_number),
+    product_number: displayNumber(p.product_type, p.product_number),
     currency: p.currency,
     status: p.product_status,
     balance: balance(p),

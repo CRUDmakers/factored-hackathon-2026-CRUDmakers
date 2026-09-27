@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../src/db/prisma.js';
-import { ANA, UNKNOWN, balanceOf, resetData, testApp } from './helpers.js';
+import { ANA, SERVICE, UNKNOWN, balanceOf, ownerApp, resetData } from './helpers.js';
 
 let app: FastifyInstance;
 beforeAll(async () => {
-  app = await testApp();
+  app = await ownerApp();
 });
 beforeEach(resetData);
 afterAll(() => app.close());
@@ -14,7 +14,7 @@ const CHK = 'PRD-ANACHK000001';
 const base = `/api/customers/${ANA}/scheduled-payments`;
 
 const create = (payload: object) => app.inject({ method: 'POST', url: base, payload });
-const run = async () => (await app.inject({ method: 'POST', url: '/api/scheduled-payments/run' })).json().executed;
+const run = async () => (await app.inject({ method: 'POST', url: '/api/scheduled-payments/run', headers: SERVICE })).json().executed;
 const get = async (id: string) => (await app.inject(`${base}/${id}`)).json();
 
 const transfer = (extra: object = {}) => ({
@@ -195,7 +195,7 @@ describe('execução', () => {
         next_run_at: new Date(),
       },
     });
-    const res = await app.inject({ method: 'POST', url: '/api/scheduled-payments/run' });
+    const res = await app.inject({ method: 'POST', url: '/api/scheduled-payments/run', headers: SERVICE });
     expect(res.statusCode).toBe(500);
     const row = await prisma.scheduledPayment.findUniqueOrThrow({ where: { scheduled_payment_id: 'SCH-BROKEN' } });
     expect(row).toMatchObject({ status: 'active', executions_count: 0 });
