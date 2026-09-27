@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: banking
+      POSTGRES_PASSWORD: banking
+      POSTGRES_DB: banking
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U banking -d banking"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Aplica as migrações e sobe a API (Swagger em http://localhost:3000/docs).
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://banking:banking@db:5432/banking
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Carga dos CSVs de ./data (rodar uma vez): docker compose run --rm etl
+  etl:
+    build: ./backend
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/etl/cli.js"]
+    environment:
+      DATABASE_URL: postgresql://banking:banking@db:5432/banking
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["etl"]
+
+  # Testes com cobertura contra o banco banking_test: docker compose run --rm test
+  test:
+    build:
+      context: ./backend
+      target: build
+    command: ["npm", "run", "test:coverage"]
+    environment:
+      TEST_DATABASE_URL: postgresql://banking:banking@db:5432/banking_test
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["test"]
+
+volumes:
+  pgdata:
