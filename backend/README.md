@@ -38,6 +38,7 @@ npx prisma migrate deploy      # banco em DATABASE_URL (padrão: localhost:5432/
 npm run etl:dev                # carrega ../data
 npm run dev                    # API com reload
 npm run test:coverage          # usa TEST_DATABASE_URL (padrão: localhost:5432/banking_test)
+npm run db:reset               # volta o banco ao estado inicial: recarrega ../data e APAGA operações simuladas e agendamentos
 npm run studio                 # Prisma Studio em http://localhost:5555 para navegar no banco
 ```
 
