@@ -1,0 +1,4 @@
+customer_id,segment,country,customer_status,tags
+CLI-AAAA1111,Basic,México,Active,country_México;fraud_score_high
+CLI-BBBB2222,Premium,Colombia,Active,country_Colombia;past_due
+CLI-CCCC3333,Basic,México,Suspended,customer_not_active

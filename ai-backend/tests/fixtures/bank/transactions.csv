@@ -1,0 +1,9 @@
+transaction_id,transaction_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,branch_id,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score
+TRX-A1,2026-06-15 10:00:00,PRD-ACC,CLI-AAAA1111,Purchase,Food,45.90,USD,,POS,,Uber Eats,Food,México,Tijuana,Approved,00,False,12.5
+TRX-A2,2026-06-16 11:00:00,PRD-ACC,CLI-AAAA1111,Purchase,Transport,120.00,USD,,POS,,Uber,Transport,México,Tijuana,Declined,51,False,20.0
+TRX-A3,2026-06-17 09:00:00,PRD-ACHK,CLI-AAAA1111,Withdrawal,,200.00,USD,,ATM,SUC-TEST0001,,,México,Tijuana,Approved,00,False,
+TRX-A4,2026-06-10 20:00:00,PRD-ACC,CLI-AAAA1111,Purchase,Entertainment,912.40,USD,,POS,,Cine Premium,Entertainment,Brazil,São Paulo,Approved,00,True,88.1
+TRX-A5,2026-06-12 08:00:00,PRD-ACHK,CLI-AAAA1111,Transfer,,300.00,USD,,App,,,,Mexico,,Declined,,False,5.0
+TRX-A6,2026-06-11 12:00:00,PRD-ACHK,CLI-AAAA1111,Payment,,80.00,USD,,Web,,Cable TV,Services,México,,Approved,00,False,1.0
+TRX-B1,2026-06-14 14:00:00,PRD-BCHK,CLI-BBBB2222,Payment,Services,150000.00,COP,37.50,Web,,Servicios Públicos,Services,Colombia,Bogotá,Pending,05,False,3.2
+TRX-B2,2026-06-13 09:00:00,PRD-BCHK,CLI-BBBB2222,Deposit,,400000.00,COP,,App,,,,Colombia,Bogotá,Approved,00,False,0.5
