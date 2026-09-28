@@ -21,19 +21,36 @@ async def run(ctx, name, **args):
 # ---------- schemas ----------
 
 
-def test_every_p0_read_tool_is_registered():
-    assert set(REGISTRY) == {
-        "get_balances", "search_transactions", "get_transaction", "convert_currency"
+def test_every_p0_tool_is_registered():
+    kinds = {name: t.kind for name, t in REGISTRY.items()}
+    assert kinds == {
+        "get_balances": "read", "search_transactions": "read", "get_transaction": "read",
+        "convert_currency": "read", "transfer_money": "write", "pay_bill": "write",
+        "handoff_to_human": "escalate",
     }
-    assert all(t.kind == "read" for t in REGISTRY.values())
+
+
+def _objects(schema):
+    yield schema
+    for prop in schema.get("properties", {}).values():
+        if prop.get("type") == "object":
+            yield from _objects(prop)
 
 
 def test_schemas_are_strict_and_simple():
     for tool in tool_schemas():
         params = tool["function"]["parameters"]
-        assert params["additionalProperties"] is False
         text = str(params)
-        assert "anyOf" not in text and "customer" not in text  # no identity parameters
+        assert "anyOf" not in text and "$ref" not in text
+        for obj in _objects(params):
+            assert obj["additionalProperties"] is False
+            assert not any("customer" in name for name in obj["properties"])  # no identity
+
+
+def test_nested_beneficiary_is_inlined():
+    beneficiary = parameters_schema(get_tool("transfer_money"))["properties"]["beneficiary"]
+    assert beneficiary["type"] == "object"
+    assert beneficiary["required"] == ["name", "account_number", "country"]
 
 
 def test_money_is_a_number_and_date_keeps_its_public_name():
@@ -81,7 +98,8 @@ async def test_response_codes_only_for_declined(ctx, bank, session_b):
     pending = next(t for t in r.data["transactions"] if t["transaction_id"] == "TRX-B1")
     assert pending["transaction_status"] == "Pending" and pending["response_code"] is None
     detail = await run(ctx_b, "get_transaction", transaction_id="TRX-B1")
-    assert detail.data["status"]["reason_code"] is None
+    assert "decline_reason" not in detail.data["status"]
+    assert detail.data["status"]["response_code"] is None
 
 
 @pytest.mark.parametrize(
@@ -104,9 +122,31 @@ async def test_invalid_arguments_become_an_error_result(ctx, args):
 
 async def test_get_transaction(ctx):
     r = await run(ctx, "get_transaction", transaction_id="TRX-A2")
-    assert r.data["status"]["reason_code"] == "insufficient_funds"
+    assert r.data["status"]["decline_reason"] == "insufficient funds or credit limit"
+    assert "reason_code" not in r.data["status"]  # readable text, not a machine code
     assert "flagged_as_fraud" not in r.data
-    assert r.facts[0].record_id == "TRX-A2" and "(insufficient_funds)" in r.facts[0].fact
+    assert r.facts[0].record_id == "TRX-A2"
+    assert "(code 51: insufficient funds or credit limit)" in r.facts[0].fact
+
+
+async def test_get_transaction_policy_facts(ctx):
+    fraud = await run(ctx, "get_transaction", transaction_id="TRX-A4")
+    [fact] = fraud.policy_facts
+    assert fact == {
+        "kind": "transaction", "transaction_id": "TRX-A4", "flagged_as_fraud": True,
+        "fraud_score": None, "product_id": "PRD-ACC", "product_status": "Active",
+    }
+    # The model never sees them.
+    assert "flagged_as_fraud" not in str(fraud.data)
+
+
+async def test_product_status_unknown_when_the_product_read_fails(bank, session_a):
+    from ai_backend.bank.faults import BankFault, FaultyBankClient
+
+    faulty = FaultyBankClient(bank, [BankFault(method="get_product", fault="timeout")])
+    ctx = d.ToolContext(bank=faulty, session=session_a, today=NOW.date())
+    r = await run(ctx, "get_transaction", transaction_id="TRX-A1")
+    assert r.ok and r.policy_facts[0]["product_status"] is None
 
 
 async def test_other_customers_transaction_is_not_found(bank, session_b):

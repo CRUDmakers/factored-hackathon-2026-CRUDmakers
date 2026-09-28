@@ -35,6 +35,13 @@ from ai_backend.bank.models import (
 from ai_backend.fx.convert import Side, convert
 
 ToolKind = Literal["read", "write", "escalate"]
+# Node's reason codes, as the model should read them (it replies in the customer's language).
+DECLINE_REASONS = {
+    "insufficient_funds": "insufficient funds or credit limit",
+    "invalid_account": "invalid account, card or recipient",
+    "do_not_honor": "not authorised by the bank (no reason recorded)",
+    "expired_card": "expired card",
+}
 # How many rows search_transactions scans when it has to filter in Python (R3).
 SCAN_LIMIT = 200
 
@@ -61,6 +68,8 @@ class ToolResult:
     facts: list[Fact] = field(default_factory=list)
     error_code: str | None = None
     error_message: str | None = None
+    # Policy-view facts (fraud flag, product status…): for the policy engine, never the model.
+    policy_facts: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def error(cls, code: str, message: str) -> ToolResult:
@@ -101,7 +110,7 @@ async def get_balances(ctx: ToolContext, args: GetBalancesArgs) -> ToolResult:
     facts += [
         Fact(
             f"{loan.product_type}: outstanding {loan.outstanding_balance} {loan.currency}, "
-            f"{loan.days_past_due or 0} days past due ({loan.status})",
+            f"{int(loan.days_past_due or 0)} days past due ({loan.status})",
             "get_balances",
             loan.product_id,
         )
@@ -218,21 +227,47 @@ async def get_transaction(ctx: ToolContext, args: GetTransactionArgs) -> ToolRes
         ctx.session, args.transaction_id
     )
     data = detail.llm_view().model_dump(mode="json")
-    if data["status"]["status"] != "Declined":
-        data["status"]["reason_code"] = None
-        data["status"]["response_code"] = None
     status = data["status"]
+    code = status.pop("reason_code")
+    if status["status"] == "Declined":
+        status["decline_reason"] = DECLINE_REASONS.get(code or "", "no reason recorded")
+    else:
+        status["response_code"] = None  # R5: no reasons for other statuses
     fact = (
         f"{data['transaction_type']} of {data['amount']} {data['currency']}"
         f"{' at ' + data['merchant_name'] if data['merchant_name'] else ''} on "
         f"{data['transaction_date'][:10]}: {status['status']}"
-        f"{' (' + status['reason_code'] + ')' if status['reason_code'] else ''}"
+        + (
+            f" (code {status['response_code']}: {status['decline_reason']})"
+            if "decline_reason" in status
+            else ""
+        )
     )
     return ToolResult(
         ok=True,
         data=data,
         facts=[Fact(fact, "get_transaction", detail.transaction_id)],
+        policy_facts=[
+            {
+                "kind": "transaction",
+                "transaction_id": detail.transaction_id,
+                "flagged_as_fraud": detail.flagged_as_fraud,
+                "fraud_score": detail.fraud_score,
+                "product_id": detail.product_id,
+                "product_status": await _product_status(ctx, detail.product_id),
+            }
+        ],
     )
+
+
+async def _product_status(ctx: ToolContext, product_id: str | None) -> str | None:
+    """The status of the product a transaction belongs to, for PRODUCT_BLOCKED."""
+    if product_id is None:
+        return None
+    try:
+        return (await ctx.bank.get_product(ctx.session, product_id)).status
+    except (NotFound, BankUnavailable, BankContractError):
+        return None
 
 
 # ---------- convert_currency ----------
@@ -292,18 +327,25 @@ class ToolSpec:
     description: str
     args_model: type[_Args]
     kind: ToolKind
-    handler: Handler
+    handler: Handler | None = None  # reads only; writes and escalations run in the graph
 
-    async def run(self, ctx: ToolContext, raw_args: dict[str, Any]) -> ToolResult:
-        """Validate the model's arguments and run the tool. Bank failures become error results;
-        `AuthExpired` and `Forbidden` propagate, because the turn must stop."""
+    def parse(self, raw_args: dict[str, Any]) -> _Args | ToolResult:
+        """The validated arguments, or an `invalid_arguments` error result for the model."""
         try:
-            args = self.args_model.model_validate(raw_args)
+            return self.args_model.model_validate(raw_args)
         except ValidationError as exc:
             problems = "; ".join(
                 f"{'.'.join(map(str, e['loc'])) or 'args'}: {e['msg']}" for e in exc.errors()
             )
             return ToolResult.error("invalid_arguments", problems)
+
+    async def run(self, ctx: ToolContext, raw_args: dict[str, Any]) -> ToolResult:
+        """Validate the model's arguments and run a read tool. Bank failures become error
+        results; `AuthExpired` and `Forbidden` propagate, because the turn must stop."""
+        assert self.handler is not None, f"{self.name} is not a read tool"
+        args = self.parse(raw_args)
+        if isinstance(args, ToolResult):
+            return args
         try:
             return await self.handler(ctx, args)
         except NotFound:
