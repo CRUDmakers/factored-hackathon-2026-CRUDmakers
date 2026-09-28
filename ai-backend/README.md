@@ -1,0 +1,69 @@
+# AI backend
+
+Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
+
+**Status:** M0 (skeleton, config, `/v1/health`, Node-shaped bank layer: fake + HTTP clients, fault injection, contract tests, fixture).
+
+## Setup
+
+```bash
+cd ai-backend
+python3.11 -m venv .venv
+.venv/bin/pip install -e ".[dev]"
+cp .env.example .env   # fake mode needs nothing
+```
+
+## Run
+
+```bash
+.venv/bin/uvicorn ai_backend.api.app:app --reload                  # BANK_MODE=fake (default)
+BANK_MODE=http BANK_BASE_URL=http://localhost:3000 \
+  .venv/bin/uvicorn ai_backend.api.app:app --reload                  # against Node
+curl localhost:8000/v1/health
+```
+
+In http mode, the AI backend checks every session with Node (`GET /auth/sessions/current`) and forwards the customer's token. It never holds Node's JWT secret or service key.
+
+## Bank layer
+
+| Module | What it is |
+|---|---|
+| `bank/client.py` | The `BankClient` interface and errors, modelled on Node's API |
+| `bank/http_client.py` | Node client: token forwarding, retries for reads only, error mapping, exact decimals |
+| `bank/fake_client.py` | Offline bank that behaves like Node (sessions, scoping, payments, declines), for tests and eval |
+| `bank/faults.py` | Fault injection for either client: `timeout`, `error_500`, `malformed`, `slow`, `lost_response` |
+
+## Offline fixture
+
+`BANK_MODE=fake` reads a stratified extract of the same dataset Node loads, from `eval/fixtures/data/`. It has 80 customers, including the frontend's demo customers. Personal data is removed, and card numbers keep only their last 4 digits. To rebuild it, you need the S3 credentials in the repo-root `.env`:
+
+```bash
+.venv/bin/pip install -e ".[fixtures]"
+.venv/bin/python -m eval.fixtures.download --start 2025-12-20 --end 2026-06-17   # into ../data (gitignored)
+.venv/bin/python -m eval.fixtures.extract
+```
+
+## Test
+
+```bash
+.venv/bin/python -m pytest -q        # unit + integration + contract suite against the fake
+.venv/bin/ruff check .
+```
+
+### Contract tests against a live Node
+
+`tests/contract/` runs the same cases against the fake and against Node, so the fake can't drift from what we ship. Against Node, start the stack from the repo root and load the data, then run the suite:
+
+```bash
+docker compose up -d db && docker compose run --rm etl && docker compose up -d api
+BANK_BASE_URL=http://localhost:3000 EVAL_SERVICE_KEY=demo-service-key \
+  .venv/bin/python -m pytest -q -m node tests/contract
+```
+
+The suite makes a small real transfer (1.00 USD between one demo customer's own accounts). Reset Node's database afterwards if you need a clean state (`cd ../backend && npm run db:reset`).
+
+If ports 3000 or 5432 are taken, run the stack as a separate project with an override file that remaps them. For example, use `ports: !reset []` for `db`, and `ports: !override ["3100:3000"]` for `api`:
+
+```bash
+docker compose -p bcs-contract -f docker-compose.yml -f <override.yml> up -d db
+```

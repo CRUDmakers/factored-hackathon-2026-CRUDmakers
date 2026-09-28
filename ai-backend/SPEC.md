@@ -170,7 +170,7 @@ The models follow Node's responses, but only the fields we use (extra fields are
 - **`*LLMView`**: what the model and the customer may see.
 - **`*PolicyView`**: `LLMView` + fields for the policy engine only. `.llm_view()` strips them.
 
-Node returns money as decimal JSON values (Prisma `Decimal`). Parse them into `Decimal` and check the exact encoding against `/docs/json` on a live instance.
+Node returns money as **JSON numbers**, not strings (checked against a live instance on 2026-09-28). The HTTP client parses JSON with `parse_float=Decimal`, so the digits Node printed are kept exactly and never pass through a Python `float`.
 
 | Model | Node source | Fields |
 |---|---|---|
@@ -189,7 +189,7 @@ Node returns money as decimal JSON values (Prisma `Decimal`). Parse them into `D
 | `PixDestination` (P1) | | `pix_key` |
 | `PaymentResult` | `POST /transfers \| /bill-payments \| /pix` (dry run or real) | `transaction_id (null on dry run), transaction_date, method, transaction_type, amount, currency, source {product_id, product_type, currency, debited_amount, balance_after}, exchange \| null, counterparty, status, completed, response_code, reason_code, decline_detail, preview?` |
 
-- **Sending amounts:** Node's schema expects a JSON number for `amount`. Serialise the `Decimal` as a number literal with at most 2 decimal places, never through `float`.
+- **Sending amounts:** Node's schema expects a JSON number for `amount`. Serialise the `Decimal` as a number literal with at most 2 decimal places, never through `float` (`http_client.dumps_exact`).
 - **Free text:** Node's `reason`, `status_description` and `decline_detail` are pt-BR text. Keep them as data; the model answers in the customer's language from the codes.
 - **Removed in v0.2:** `AccountSummary`, `Case`, `CaseRequest`, `ContactRecord`, `SimulatedAction`, `ActionRequest`.
 
