@@ -7,8 +7,7 @@ name = "ai-backend"
 version = "0.1.0"
 description = "Banco LATAM transactional customer-service assistant (AI backend)"
 requires-python = ">=3.11,<3.12"
-# Agent (LangGraph/LangChain) and ML (classifier) dependencies are added and pinned in the
-# milestones that introduce them (M1 and M4), after checking their current APIs.
+# ML (classifier) dependencies are added and pinned in M4, after checking their current APIs.
 dependencies = [
     "fastapi==0.141.1",
     "uvicorn==0.54.0",
@@ -17,6 +16,14 @@ dependencies = [
     "httpx==0.28.1",
     "structlog==26.1.0",
     "PyYAML==6.0.3",
+    # Agent (APIs checked against these versions on 2026-09-28)
+    "langgraph==1.2.12",
+    "langgraph-checkpoint-sqlite==3.1.1",
+    "aiosqlite==0.22.1",
+    "langchain-core==1.6.5",
+    "langchain-openai==1.6.6",
+    "langchain-anthropic==1.7.4",
+    "lingua-language-detector==2.1.1",
 ]
 
 [project.optional-dependencies]
@@ -42,7 +49,11 @@ testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-markers = ["node: needs a live Node mock bank (BANK_BASE_URL, EVAL_SERVICE_KEY)"]
+markers = [
+    "node: needs a live Node mock bank (BANK_BASE_URL, EVAL_SERVICE_KEY)",
+    "llm: calls the configured agent model (needs its credentials in .env)",
+]
+addopts = "-m 'not llm'"
 
 [tool.ruff]
 line-length = 100
