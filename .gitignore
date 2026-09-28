@@ -84,4 +84,6 @@ wandb/
 # ai-backend local artifacts
 ai-backend/*.db
 *.part
-*eval/
+# Extracted fixture data: synthetic but kept out of the public repo (rebuild it with
+# `python -m eval.fixtures.extract`, see ai-backend/README.md).
+ai-backend/eval/fixtures/data/
