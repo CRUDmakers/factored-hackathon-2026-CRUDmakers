@@ -76,6 +76,7 @@ class ChatService:
     clock: Callable[[], datetime]
     history_end: date
     locks: ConversationLock = field(default_factory=InProcessLock)
+    classifier: Any | None = None
 
     async def authenticate(self, token: str | None) -> Session:
         if not token:
@@ -139,6 +140,8 @@ class ChatService:
             handoffs=self.handoffs,
             clock=self.clock,
             history_end=self.history_end,
+            conversations=self.conversations,
+            classifier=self.classifier,
         )
         text = message or CONFIRMATION_TEXT[(confirmation or {}).get("decision", "reject")]
         try:

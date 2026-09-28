@@ -21,7 +21,7 @@ from ai_backend.agent.state import AgentContext, AgentState
 
 EDGES: dict[str, list[str]] = {
     "intake": ["preprocess", "mark_executing", "reconcile", "respond"],
-    "preprocess": ["agent", "respond"],
+    "preprocess": ["agent", "handoff", "respond"],
     "agent": ["policy_gate", "handoff", "respond"],
     "policy_gate": ["tools", "prepare_write", "handoff", "agent", "respond"],
     "tools": ["escalation_check", "handoff", "respond"],

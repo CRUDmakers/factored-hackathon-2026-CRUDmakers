@@ -28,6 +28,7 @@ def _settings(**overrides) -> Settings:
         policy_config_path=ROOT / "config" / "policy.yaml",
         anthropic_api_key="test-key",
         db_url="memory://",
+        classifier_path=None,  # classifier routing is tested with an injected stub
         clock_override=NOW,
     )
     base.update(overrides)
@@ -114,7 +115,7 @@ def test_pt_payment_status_is_answered_from_the_bank():
         assert tool["tool"] == "search_transactions" and tool["outcome"] == "ok"
         assert tool["args_redacted"]["merchant"] == "Uber"
         agent = next(e for e in events if e["node"] == "agent")
-        assert agent["tokens_in"] == 100 and agent["prompt_version"] == "system_v2"
+        assert agent["tokens_in"] == 100 and agent["prompt_version"] == "system_v3"
         assert {e["trace_id"] for e in events} == {body["trace_id"]}
 
         # Verified facts are kept for the handoff (M2).

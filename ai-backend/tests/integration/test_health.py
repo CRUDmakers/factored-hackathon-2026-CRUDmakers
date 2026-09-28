@@ -25,6 +25,7 @@ def _settings(**overrides) -> Settings:
         policy_config_path=ROOT / "config" / "policy.yaml",
         anthropic_api_key="test-key",
         db_url="memory://",
+        classifier_path=None,  # classifier routing is tested with an injected stub
     )
     base.update(overrides)
     return Settings(**base)

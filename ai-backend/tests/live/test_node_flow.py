@@ -39,6 +39,7 @@ class NodeChat:
             bank_base_url=BASE,
             db_url="memory://",
             anthropic_api_key="unused",  # the scripted model replaces the real one
+            classifier_path=None,
             models_config_path=ROOT / "config" / "models.yaml",
             policy_config_path=ROOT / "config" / "policy.yaml",
         )

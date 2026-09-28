@@ -15,7 +15,16 @@ def test_repo_policy_config_loads_with_spec_values():
     assert policy.limits.confirmation_ttl_seconds == 300
     assert policy.limits.write_amount_limit_usd == Decimal("5000")
     assert policy.thresholds.fraud_score_escalate == Decimal("40")
-    assert policy.routing.human_confidence_tau == 0.80
+    # Routing thresholds come from the trained classifier unless overridden here.
+    r = policy.routing
+    assert r.human_confidence_tau is r.human_direct_tau is r.out_of_scope_min_confidence is None
+    model = {
+        "human_confidence_tau": 0.2,
+        "human_direct_tau": 0.6,
+        "out_of_scope_min_confidence": 0.5,
+    }
+    assert r.resolve(model) == model
+    assert r.model_copy(update={"human_direct_tau": 0.9}).resolve(model)["human_direct_tau"] == 0.9
     assert policy.timeouts_seconds.bank == 3
     assert policy.retries.max == 2
 
@@ -34,8 +43,10 @@ def test_unknown_model_key_is_a_config_error():
 
 
 def test_policy_rejects_unknown_keys(tmp_path: Path):
-    text = (CONFIG / "policy.yaml").read_text().replace(
-        "max_clarifications: 2", "max_clarifications: 2\n  max_clarificatons: 3"
+    text = (
+        (CONFIG / "policy.yaml")
+        .read_text()
+        .replace("max_clarifications: 2", "max_clarifications: 2\n  max_clarificatons: 3")
     )
     path = tmp_path / "policy.yaml"
     path.write_text(text)
@@ -44,8 +55,10 @@ def test_policy_rejects_unknown_keys(tmp_path: Path):
 
 
 def test_policy_rejects_out_of_range_values(tmp_path: Path):
-    text = (CONFIG / "policy.yaml").read_text().replace(
-        "human_confidence_tau: 0.80", "human_confidence_tau: 1.5"
+    text = (
+        (CONFIG / "policy.yaml")
+        .read_text()
+        .replace("human_confidence_tau: null", "human_confidence_tau: 1.5")
     )
     path = tmp_path / "policy.yaml"
     path.write_text(text)

@@ -46,6 +46,7 @@ def preview(**overrides) -> PolicyDecision:
 
 def test_read_is_allowed():
     assert evaluate(READ, facts(), CONFIG) == ALLOW
+    assert evaluate(READ, facts(clarifications=2), CONFIG) == ALLOW  # the limit itself is fine
 
 
 def test_auth_expired():
@@ -66,7 +67,7 @@ def test_cross_customer_stops_the_turn():
 
 @pytest.mark.parametrize(
     ("overrides", "limit"),
-    [({"tool_steps": 6}, "tool_steps"), ({"clarifications": 2}, "clarifications")],
+    [({"tool_steps": 6}, "tool_steps"), ({"clarifications": 3}, "clarifications")],
 )
 def test_limit_reached(overrides, limit):
     d = evaluate(READ, facts(**overrides), CONFIG)

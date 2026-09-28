@@ -13,7 +13,7 @@ import json
 import re
 import unicodedata
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from importlib import resources
 from typing import Any
@@ -50,7 +50,20 @@ from ai_backend.tools.payments import (
     to_payment_request,
 )
 
-PROMPT_VERSION = "system_v2"
+PROMPT_VERSION = "system_v3"
+ROUTING_NOTES = {
+    "possible_human": (
+        "\n## Routing note\nA triage model thinks this message may need a human agent (fraud, "
+        "a dispute, a complaint, debt, a cancellation or an explicit request for a person). If "
+        "it does, call handoff_to_human; if it doesn't, answer normally.\n"
+    ),
+    "clarify": (
+        "\n## Routing note\nA triage model thinks this message may lack key details. If it "
+        "does, ask one short clarifying question instead of guessing.\n"
+    ),
+}
+# Intents where asking again in another conversation means the problem wasn't solved.
+REPEAT_INTENTS = frozenset({"follow_up", "decline_reason"})
 LANGUAGE_NAMES = {"es": "Spanish", "pt": "Brazilian Portuguese"}
 # Finish reasons that mean the provider refused or filtered the answer.
 REFUSALS = {"refusal", "content_filter"}
@@ -58,12 +71,13 @@ REFUSALS = {"refusal", "content_filter"}
 RECONCILE_SKEW = timedelta(seconds=60)
 
 
-def system_prompt(ctx: AgentContext, language: str) -> str:
+def system_prompt(ctx: AgentContext, language: str, routing_note: str | None = None) -> str:
     template = resources.files("ai_backend.agent.prompts").joinpath(f"{PROMPT_VERSION}.md")
     return template.read_text(encoding="utf-8").format(
         language_name=LANGUAGE_NAMES.get(language, "Spanish"),
         today=ctx.today.isoformat(),
         history_end=ctx.history_end.isoformat(),
+        routing_note=ROUTING_NOTES.get(routing_note or "", ""),
     )
 
 
@@ -144,12 +158,72 @@ def _action(pending: dict[str, Any], status: str, **extra: Any) -> dict[str, Any
 
 async def preprocess(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     ctx = runtime.context
+    text_in = _last_user_text(state)
     with ctx.tracer.span("preprocess") as event:
-        language = detect(_last_user_text(state), state.get("language"))
+        language = detect(text_in, state.get("language"))
         event["outcome"] = f"language={language}"
     if language == "other":
         return {"outcome": "refused", "status": "refused", **_reply(text.UNSUPPORTED_LANGUAGE)}
-    return {"language": language, "next_step": "agent"}
+    update: dict[str, Any] = {"language": language, "next_step": "agent"}
+    if ctx.classifier is None:
+        return update
+    return {**update, **await _route(state, ctx, text_in, language)}
+
+
+async def _route(
+    state: AgentState, ctx: AgentContext, message: str, language: str
+) -> dict[str, Any]:
+    """The classifier's triage (ARCHITECTURE §5), with thresholds from policy.yaml."""
+    classifier, limits = ctx.classifier, ctx.policy.limits
+    assert classifier is not None
+    t = ctx.policy.routing.resolve(classifier.meta["thresholds"])
+    with ctx.tracer.span("route") as event:
+        p = classifier.predict(message, tau=t["human_confidence_tau"])
+        event["outcome"] = (
+            f"route={p.route} confidence={p.confidence:.2f} p_human={p.p_human:.2f} "
+            f"intent={p.intent}"
+        )
+        update: dict[str, Any] = {
+            "route": p.route,
+            "route_confidence": round(p.confidence, 4),
+            "intent": p.intent,
+        }
+
+        def escalate(code: ReasonCode) -> dict[str, Any]:
+            event["reason_code"] = code.value
+            return {**update, "escalation": [code.value], "next_step": "handoff"}
+
+        if p.p_human >= t["human_direct_tau"]:
+            return escalate(ReasonCode.HUMAN_ROUTE)
+        if p.intent in REPEAT_INTENTS and ctx.conversations is not None:
+            now = datetime.now(UTC)  # real time: contacts happen in real time, even in eval
+            conversation = ctx.tracer.conversation_id
+            customer = ctx.session.customer_id
+            await ctx.conversations.record_intent(conversation, customer, p.intent, now)
+            earlier = await ctx.conversations.count_recent(
+                customer,
+                p.intent,
+                now - timedelta(days=ctx.policy.thresholds.repeat_contact_window_days),
+                exclude_conversation=conversation,
+            )
+            if earlier >= ctx.policy.thresholds.repeat_contact_count:
+                return escalate(ReasonCode.REPEAT_CONTACT)
+        if p.route == "out_of_scope" and p.confidence >= t["out_of_scope_min_confidence"]:
+            event["reason_code"] = ReasonCode.OUT_OF_SCOPE.value
+            return {
+                **update,
+                "outcome": "refused",
+                "status": "refused",
+                **_reply(text.message("out_of_scope", language)),  # type: ignore[arg-type]
+            }
+        if p.p_human >= t["human_confidence_tau"]:
+            return {**update, "routing_note": "possible_human"}
+        if p.route == "clarify":
+            clarifications = state.get("clarifications", 0) + 1
+            if clarifications > limits.max_clarifications:
+                return escalate(ReasonCode.LIMIT_REACHED)
+            return {**update, "routing_note": "clarify", "clarifications": clarifications}
+        return {**update, "clarifications": 0}
 
 
 # ---------- agent ----------
@@ -158,7 +232,10 @@ async def preprocess(state: AgentState, runtime: Runtime[AgentContext]) -> dict[
 async def agent(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str, Any]:
     ctx = runtime.context
     language = state.get("language", "es")
-    prompt: list[AnyMessage] = [SystemMessage(system_prompt(ctx, language)), *state["messages"]]
+    prompt: list[AnyMessage] = [
+        SystemMessage(system_prompt(ctx, language, state.get("routing_note"))),
+        *state["messages"],
+    ]
     failed = {"escalation": [ReasonCode.ASSISTANT_FAILURE.value], "next_step": "handoff"}
 
     with ctx.tracer.span(
@@ -672,6 +749,7 @@ async def handoff(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str
             model_id=ctx.model_spec.model,
             summary=state.get("handoff_summary"),
             open_questions=state.get("handoff_questions"),
+            customer_message=_last_user_text(state) or None,
         )
         await ctx.handoffs.save(record)
         event.update(outcome=record.handoff_id, reason_code=record.reason_codes[0])

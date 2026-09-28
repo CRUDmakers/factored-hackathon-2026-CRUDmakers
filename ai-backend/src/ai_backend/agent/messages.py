@@ -40,6 +40,14 @@ _BY_LANGUAGE: dict[str, dict[str, str]] = {
         "es": "No hay ninguna operación pendiente de confirmación.",
         "pt": "Não há nenhuma operação pendente de confirmação.",
     },
+    "out_of_scope": {
+        "es": "Eso no lo puedo resolver por aquí. Te puedo ayudar con saldos, movimientos, "
+        "estado de pagos, transferencias y pago de cuentas; para lo demás, comunícate con el "
+        "banco por sus canales oficiales.",
+        "pt": "Isso eu não consigo resolver por aqui. Posso ajudar com saldos, extrato, status "
+        "de pagamentos, transferências e pagamento de contas; para o resto, fale com o banco "
+        "pelos canais oficiais.",
+    },
     "bank_refused_execution": {
         "es": "El banco no aceptó la operación al ejecutarla. No se movió dinero.",
         "pt": "O banco não aceitou a operação ao executá-la. Nenhum dinheiro foi movimentado.",

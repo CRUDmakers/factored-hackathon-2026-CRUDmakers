@@ -71,6 +71,7 @@ class AppState:
     service: ChatService | None  # None when the agent model has no credentials
     service_problem: str | None = None
     storage_check: Callable[[], Awaitable[None]] | None = None
+    classifier_status: tuple[bool, str] = (True, "disabled")
 
 
 def make_clock(settings: Settings) -> Callable[[], datetime]:
@@ -83,10 +84,11 @@ async def build_state(
     stack: AsyncExitStack,
     llm: BaseChatModel | None = None,
     clock: Callable[[], datetime] | None = None,
+    classifier: Any | None = None,
 ) -> AppState:
     """Load everything the app needs. Invalid config fails here, so the app never starts broken.
 
-    `llm` replaces the configured agent model and `clock` the configured clock (tests).
+    `llm`, `clock` and `classifier` replace the configured ones (tests).
     """
     models = load_model_registry(settings.models_config_path)
     policy = load_policy_config(settings.policy_config_path)
@@ -103,6 +105,7 @@ async def build_state(
         bank = http
 
     stores = await _storage(settings, stack)
+    classifier, classifier_status = _load_classifier(settings, classifier)
 
     spec = models.get(settings.agent_model)
     problem = None
@@ -130,10 +133,32 @@ async def build_state(
             traces=stores.traces,
             handoffs=stores.handoffs,
             locks=stores.lock,
+            classifier=classifier,
             clock=clock,
             history_end=settings.history_end,
         )
-    return AppState(settings, models, policy, bank, service, problem, stores.check)
+    return AppState(
+        settings, models, policy, bank, service, problem, stores.check, classifier_status
+    )
+
+
+def _load_classifier(
+    settings: Settings, injected: Any | None
+) -> tuple[Any | None, tuple[bool, str]]:
+    if injected is not None:
+        return injected, (True, "loaded (injected)")
+    path = settings.classifier_path
+    if path is None:
+        return None, (True, "disabled: the agent routes alone")
+    if not path.exists():
+        return None, (False, f"not trained: run `python -m ai_backend.classifier.train` ({path})")
+    from ai_backend.classifier.predict import RouteClassifier
+
+    classifier = RouteClassifier.load(path)
+    return classifier, (
+        True,
+        f"loaded ({classifier.meta.get('features')}, trained {classifier.meta.get('trained_at')})",
+    )
 
 
 @dataclass(frozen=True)
@@ -198,13 +223,14 @@ def create_app(
     settings: Settings | None = None,
     llm: BaseChatModel | None = None,
     clock: Callable[[], datetime] | None = None,
+    classifier: Any | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with AsyncExitStack() as stack:
-            app.state.ai = await build_state(settings, stack, llm, clock)
+            app.state.ai = await build_state(settings, stack, llm, clock, classifier)
             yield
 
     app = FastAPI(title="Banco LATAM AI backend", version="0.1.0", lifespan=lifespan)
@@ -222,6 +248,7 @@ def create_app(
             "models": _check_models(state),
             "bank": await _check_bank(state),
             "storage": await _check_storage(state),
+            "classifier": Check(ok=state.classifier_status[0], detail=state.classifier_status[1]),
         }
         ok = all(c.ok for c in checks.values())
         if not ok:

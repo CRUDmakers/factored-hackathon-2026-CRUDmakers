@@ -51,6 +51,7 @@ class Handoff(_Model):
     language: Literal["es", "pt"]
     priority: Literal["high", "normal"]
     reason_codes: list[str] = Field(min_length=1)
+    customer_message: str | None = None  # the customer's latest message, verbatim
     request_summary: GeneratedText
     verified_facts: list[HandoffFact]
     actions_taken: list[HandoffAction]

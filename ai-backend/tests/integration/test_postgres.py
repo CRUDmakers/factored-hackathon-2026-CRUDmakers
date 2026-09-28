@@ -62,6 +62,19 @@ async def test_stores_round_trip(db_url):
         assert await conversations.owner("conv_1") == CUSTOMER_A
         assert await conversations.owner("conv_2") is None
 
+        now = datetime.now(UTC)
+        await conversations.record_intent("conv_1", CUSTOMER_A, "follow_up", now)
+        await conversations.record_intent("conv_1", CUSTOMER_A, "follow_up", now)  # once only
+        await conversations.record_intent("conv_2", CUSTOMER_A, "follow_up", now)
+        await conversations.record_intent("conv_3", "CLI-OTHER", "follow_up", now)
+        await conversations.record_intent(
+            "conv_4", CUSTOMER_A, "follow_up", now - timedelta(days=9)
+        )
+        since = now - timedelta(days=7)
+        assert await conversations.count_recent(CUSTOMER_A, "follow_up", since, "conv_9") == 2
+        assert await conversations.count_recent(CUSTOMER_A, "follow_up", since, "conv_1") == 1
+        assert await conversations.count_recent(CUSTOMER_A, "balance", since, "conv_9") == 0
+
         tracer = Tracer("conv_1", "t1")
         tracer.record("agent", datetime.now(UTC), 12.5, tokens_in=10)
         tracer.record("agent", datetime.now(UTC) - timedelta(days=40), 1.0)

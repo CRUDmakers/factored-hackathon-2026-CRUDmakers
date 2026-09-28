@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AwareDatetime, SecretStr
+from pydantic import AwareDatetime, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +37,15 @@ class Settings(BaseSettings):
     clock_override: AwareDatetime | None = None
     # The dataset's last day; Node uses the real clock for everything new (ARCHITECTURE §8).
     history_end: date = date(2026, 6, 17)
+
+    # The trained route classifier; empty/None disables classifier routing (the agent decides).
+    classifier_path: Path | None = Path("models/route_classifier.joblib")
+
+    @field_validator("classifier_path", mode="before")
+    @classmethod
+    def _empty_disables(cls, value: object) -> object:
+        # CLASSIFIER_PATH= (empty) must mean "off", not the current directory.
+        return None if value in ("", None) else value
 
     models_config_path: Path = Path("config/models.yaml")
     policy_config_path: Path = Path("config/policy.yaml")

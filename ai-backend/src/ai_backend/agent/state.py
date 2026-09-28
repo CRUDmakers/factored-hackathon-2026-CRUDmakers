@@ -15,6 +15,7 @@ from langgraph.graph.message import add_messages
 from ai_backend.auth.session import Session
 from ai_backend.bank.client import BankClient
 from ai_backend.config import ModelSpec, PolicyConfig
+from ai_backend.conversations.store import ConversationStore
 from ai_backend.handoff.store import HandoffStore
 from ai_backend.language.detect import Lang
 from ai_backend.observability.tracing import Tracer
@@ -30,7 +31,7 @@ class AgentState(TypedDict, total=False):
     actions: Annotated[list[dict[str, Any]], operator.add]
     policy_decisions: Annotated[list[dict[str, Any]], operator.add]
     handoff_ids: Annotated[list[str], operator.add]
-    clarifications: int
+    clarifications: int  # clarify turns in a row; reset by a clear request
     # A payment waiting for the customer's confirmation (ARCHITECTURE §6).
     pending_action: dict[str, Any] | None
 
@@ -41,6 +42,10 @@ class AgentState(TypedDict, total=False):
     allowed_calls: list[str] | None  # read tool-call IDs the policy gate let through
     step_policy_facts: list[dict[str, Any]] | None
     forbidden_seen: bool
+    route: str | None  # the classifier's route for this message
+    route_confidence: float | None
+    intent: str | None
+    routing_note: str | None  # possible_human | clarify: a hint for the agent's prompt
     escalation: list[str] | None  # reason codes that send this turn to a human
     handoff_summary: str | None
     handoff_questions: list[str] | None
@@ -57,6 +62,10 @@ TURN_RESET: dict[str, Any] = {
     "allowed_calls": None,
     "step_policy_facts": None,
     "forbidden_seen": False,
+    "route": None,
+    "route_confidence": None,
+    "intent": None,
+    "routing_note": None,
     "escalation": None,
     "handoff_summary": None,
     "handoff_questions": None,
@@ -83,6 +92,8 @@ class AgentContext:
     handoffs: HandoffStore
     clock: Callable[[], datetime]
     history_end: date
+    conversations: ConversationStore | None = None
+    classifier: Any | None = None  # classifier.predict.RouteClassifier; None = agent decides alone
 
     @property
     def today(self) -> date:

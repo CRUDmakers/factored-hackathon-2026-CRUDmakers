@@ -111,6 +111,15 @@ class PostgresConversationStore:
                 " conversation_id TEXT PRIMARY KEY, customer_id TEXT NOT NULL,"
                 " created_at TIMESTAMPTZ NOT NULL DEFAULT now())"
             )
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS conversation_intents ("
+                " conversation_id TEXT NOT NULL, customer_id TEXT NOT NULL, intent TEXT NOT NULL,"
+                " at TIMESTAMPTZ NOT NULL, PRIMARY KEY (conversation_id, intent))"
+            )
+            await conn.execute(
+                "CREATE INDEX IF NOT EXISTS conversation_intents_customer"
+                " ON conversation_intents (customer_id, intent, at)"
+            )
 
     async def owner(self, conversation_id: str) -> str | None:
         async with self._pool.connection() as conn:
@@ -128,6 +137,29 @@ class PostgresConversationStore:
                 " ON CONFLICT (conversation_id) DO NOTHING",
                 (conversation_id, customer_id),
             )
+
+
+    async def record_intent(
+        self, conversation_id: str, customer_id: str, intent: str, at: datetime
+    ) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                "INSERT INTO conversation_intents VALUES (%s, %s, %s, %s)"
+                " ON CONFLICT (conversation_id, intent) DO NOTHING",
+                (conversation_id, customer_id, intent, at),
+            )
+
+    async def count_recent(
+        self, customer_id: str, intent: str, since: datetime, exclude_conversation: str
+    ) -> int:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                "SELECT COUNT(*) AS n FROM conversation_intents WHERE customer_id = %s"
+                " AND intent = %s AND at >= %s AND conversation_id != %s",
+                (customer_id, intent, since, exclude_conversation),
+            )
+            row = await cur.fetchone()
+        return int(row["n"]) if row else 0
 
 
 class PostgresTraceStore:

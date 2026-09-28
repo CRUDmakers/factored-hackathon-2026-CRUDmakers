@@ -68,7 +68,7 @@ def within_budget(facts: TurnFacts, config: PolicyConfig) -> PolicyDecision | No
     limits = config.limits
     if facts.tool_steps >= limits.max_tool_steps_per_turn:
         return PolicyDecision("escalate", ReasonCode.LIMIT_REACHED, {"limit": "tool_steps"})
-    if facts.clarifications >= limits.max_clarifications:
+    if facts.clarifications > limits.max_clarifications:
         return PolicyDecision("escalate", ReasonCode.LIMIT_REACHED, {"limit": "clarifications"})
     return None
 

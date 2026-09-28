@@ -30,6 +30,7 @@ def build(
     model_id: str,
     summary: str | None = None,
     open_questions: list[str] | None = None,
+    customer_message: str | None = None,
 ) -> Handoff:
     codes = list(dict.fromkeys(reason_codes))  # keep order, drop repeats
     facts = _unique_facts(verified_facts)
@@ -46,6 +47,7 @@ def build(
         language="pt" if language == "pt" else "es",
         priority="high" if any(c in HIGH_PRIORITY for c in codes) else "normal",
         reason_codes=codes,
+        customer_message=customer_message,
         request_summary=(
             GeneratedText(text=summary, generated_by=f"model:{model_id}")
             if summary
@@ -82,6 +84,9 @@ _SUMMARIES = {
     ReasonCode.LIMIT_REACHED: "The request needed more steps than the assistant may take.",
     ReasonCode.ASSISTANT_FAILURE: "The assistant's model failed or refused to answer.",
     ReasonCode.BANK_UNAVAILABLE: "The bank's systems did not answer, even after retries.",
+    ReasonCode.HUMAN_ROUTE: "The triage model found that this request needs a person.",
+    ReasonCode.REPEAT_CONTACT: "The customer has asked about the same problem in earlier "
+    "conversations this week.",
     ReasonCode.CROSS_CUSTOMER: "The bank refused a record as belonging to another customer.",
 }
 

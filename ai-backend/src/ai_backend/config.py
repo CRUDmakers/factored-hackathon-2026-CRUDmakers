@@ -70,7 +70,21 @@ class Thresholds(_Strict):
 
 
 class Routing(_Strict):
-    human_confidence_tau: float = Field(ge=0, le=1)
+    """Optional overrides. By default the thresholds travel with the trained classifier (chosen
+    on its own validation run), so a model and its thresholds can't drift apart."""
+
+    # P(human) ≥ this flags the request to the agent as possibly needing a human.
+    human_confidence_tau: float | None = Field(default=None, ge=0, le=1)
+    # P(human) ≥ this hands off directly, without an LLM call.
+    human_direct_tau: float | None = Field(default=None, ge=0, le=1)
+    # Refuse as out of scope only above this confidence; below it, the agent decides.
+    out_of_scope_min_confidence: float | None = Field(default=None, ge=0, le=1)
+
+    def resolve(self, model_thresholds: dict[str, float]) -> dict[str, float]:
+        return {
+            key: float(value if value is not None else model_thresholds[key])
+            for key, value in self.model_dump().items()
+        }
 
 
 class Timeouts(_Strict):
