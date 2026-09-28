@@ -7,7 +7,6 @@ name = "ai-backend"
 version = "0.1.0"
 description = "Banco LATAM transactional customer-service assistant (AI backend)"
 requires-python = ">=3.11,<3.12"
-# ML (classifier) dependencies are added and pinned in M4, after checking their current APIs.
 dependencies = [
     "fastapi==0.141.1",
     "uvicorn==0.54.0",
@@ -26,6 +25,11 @@ dependencies = [
     "langchain-openai==1.6.6",
     "langchain-anthropic==1.7.4",
     "lingua-language-detector==2.1.1",
+    # Route classifier (fastembed runs the embedding model on ONNX Runtime, no PyTorch)
+    "fastembed==0.8.1",
+    "scikit-learn==1.9.1",
+    "joblib==1.6.0",
+    "numpy==2.4.6",
 ]
 
 [project.optional-dependencies]
@@ -64,3 +68,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# A markdown template: its long lines are prose inside an f-string.
+"src/ai_backend/classifier/report.py" = ["E501"]
