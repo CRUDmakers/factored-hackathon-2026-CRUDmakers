@@ -121,7 +121,8 @@ No JWT library: sessions are checked through Node (ARCHITECTURE ADR-002).
 | `BANK_BASE_URL` | Node API (`http://api:3000` in Compose) |
 | `BANK_FIXTURE_DIR` | Fixture for fake mode (default `eval/fixtures/data`) |
 | `CORS_ORIGINS` | Comma-separated frontend origins (default `http://localhost:5173`) |
-| `DB_URL` | Checkpointer + traces + conversation index (SQLite default; Postgres `ai_backend` in Compose) |
+| `DB_URL` | Checkpointer, conversations, traces and handoffs: `postgresql://…/ai_backend` in Compose (created on startup if missing), `sqlite:///<path>` locally (default), `memory://` in tests |
+| `CLOCK_OVERRIDE` | Pins "now" for the fake bank and the agent's "today" (reproducible eval); traces keep real time |
 | `TRACE_RETENTION_DAYS` | Default 30 |
 | `LOG_LEVEL` | Default `INFO` |
 
@@ -489,7 +490,7 @@ Only for response quality (clarity, tone, language correctness). Its rubric is w
 | **M0** | Sep 28 | Skeleton (done in v0.1: package, settings, config loading, `/v1/health`, fixture extraction). **Rework for v0.2:** Node-shaped bank models, `BankClient` v0.2, `FakeBankClient` with Node behaviour (sessions, 404 scoping, payment preview/execute and declines), `FaultyBankClient`, `HttpBankClient` with respx tests built from Node's code, contract suite, the frontend's demo customers in the fixture | `pytest` green; health OK in fake mode; the contract suite passes against the fake (and against a live Node when available); the fixture holds ≥ 50 customers with transactions across statuses, currencies and products, including the 4 frontend demo customers |
 | **M1** | Sep 29 | Read path: `auth_guard` (Node session check), preprocess (language only), agent + P0 read tools, respond, traces | ES and PT "did my payment go through?" answered from the fixture; the trace shows the tool calls; expired and revoked sessions give `login_required` with no LLM call |
 | **M2** | Sep 30 | Policy engine; `transfer_money` and `pay_bill` with prepare → confirm → execute → reconcile → verify; escalation_check; handoff builder | 100% branch coverage on policy; payment flow tested for approve, reject, expiry, preview decline (`51`/`54`/`05`/`14`), 422, execute timeout found and not found by reconciliation, and verify mismatch; handoff JSON validates against the schema; fraud-flagged / blocked / delinquent fixtures hand off |
-| **M3** | Oct 1 | Integration: Compose service + `ai_backend` database (R6), Postgres checkpointer, CORS, chat contract handed to the frontend, fault handling end to end, smoke tests against live Node | `docker compose up` runs db + api + ai-backend + frontend; a live-Node smoke run passes; Node timeout and 500 lead to a safe message + handoff |
+| **M3** | Oct 1 | Integration: Compose service (the database creates itself on startup), Postgres checkpointer and stores with an advisory lock, CORS, chat contract for the frontend (`CHAT_API.md`), Node failures → `BANK_UNAVAILABLE` handoff, smoke tests against live Node | `docker compose up` runs db + api + ai-backend + frontend; a live-Node smoke run passes; Node timeout and 500 lead to a safe message + handoff |
 | **M4** | Oct 1–2 | Classifier dataset, baseline, model, τ, wired into `preprocess`; repeat-contact check | Classifier report committed; test split frozen; human-route recall ≥ 0.95 on validation |
 | **M5** | Oct 2–3 | Eval harness, ≥ 200 scenarios, B0/B1/S runs × 3, model comparison, judge validation | Report with all §11.3 metrics and denominators; error analysis section listing failures |
 | **M6** | Oct 4 | Deploy, README (setup, run, eval, limitations), P1 tools if time allows | Deployed URL answers `/v1/health` and a chat turn against the deployed Node |
@@ -505,7 +506,7 @@ Investments, cases/complaints, loan applications, real payments or real money mo
 **Answered in v0.2:**
 - The Node endpoint contract: `../backend` routes + `/docs/json`.
 - The session format: HS256 JWT, `iss=banking-cs-test-idp`, `sub=customer_id`, checked through Node.
-- The database: Postgres from Compose, with a separate `ai_backend` database.
+- The database: Postgres from Compose, with a separate `ai_backend` database (the service creates it; M3).
 
 **Still open** (details in ARCHITECTURE §16):
 1. Requests R1–R6 to the Node team, especially R2 (idempotency) and R6 (Compose).

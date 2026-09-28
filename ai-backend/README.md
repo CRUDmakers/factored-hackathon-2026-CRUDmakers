@@ -2,7 +2,9 @@
 
 Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
 
-**Status:** M2. The assistant answers from the bank (read tools), makes transfers and bill payments (Node's preview → the customer confirms → executed once → verified by read-back, with reconciliation after a timeout), and hands off to a human with a structured record (`GET /v1/handoffs/{id}`), all under a code-enforced policy engine. M0 (bank layer, fixture, contract tests) is below.
+**Status:** M3. Runs in Docker Compose next to Node, Postgres and the frontend (below). Chat API for the frontend: `CHAT_API.md`.
+
+**M2:** The assistant answers from the bank (read tools), makes transfers and bill payments (Node's preview → the customer confirms → executed once → verified by read-back, with reconciliation after a timeout), and hands off to a human with a structured record (`GET /v1/handoffs/{id}`), all under a code-enforced policy engine. M0 (bank layer, fixture, contract tests) is below.
 
 ## Setup
 
@@ -13,7 +15,17 @@ python3.11 -m venv .venv
 cp .env.example .env   # fake mode needs nothing
 ```
 
-## Run
+## Run with Docker Compose (from the repo root)
+
+```bash
+docker compose up -d db && docker compose run --rm etl   # once: load the dataset into Node's database
+docker compose up -d --build                              # db + api (3000) + ai-backend (8000) + frontend (5173)
+curl localhost:8000/v1/health                             # models, bank (Node) and storage (Postgres)
+```
+
+The model settings come from `ai-backend/.env` (optional). The local 9router is reached as `host.docker.internal:20128`; override it with `AI_OPENAI_COMPAT_BASE_URL`. The `ai_backend` database is created on first start.
+
+## Run locally
 
 ```bash
 .venv/bin/uvicorn ai_backend.api.app:app --reload                  # BANK_MODE=fake (default)
@@ -74,6 +86,25 @@ In http mode, the AI backend checks every session with Node (`GET /auth/sessions
 ```bash
 .venv/bin/python -m pytest -m llm tests/live -s   # -s prints each answer, its tools, tokens and latency
 ```
+
+### Postgres storage
+
+```bash
+docker run -d --name ai-backend-pg-test -e POSTGRES_USER=banking -e POSTGRES_PASSWORD=banking -p 55432:5432 postgres:17-alpine
+TEST_POSTGRES_URL=postgresql://banking:banking@localhost:55432/banking .venv/bin/python -m pytest -m postgres
+```
+
+### Against the running stack
+
+```bash
+# Chat service ↔ live Node, scripted model (deterministic), plus the bank contract suite
+BANK_BASE_URL=http://localhost:3000 EVAL_SERVICE_KEY=demo-service-key .venv/bin/python -m pytest -m node tests/live tests/contract
+# The whole stack over HTTP with the real model: login at Node, chat with the container, check in Node
+AI_BASE_URL=http://localhost:8000 BANK_BASE_URL=http://localhost:3000 EVAL_SERVICE_KEY=demo-service-key \
+  .venv/bin/python -m pytest -m "node and llm" tests/live/test_stack_smoke.py -s
+```
+
+These make small real transfers between one demo customer's own accounts; `npm run db:reset` in `../backend` restores Node's data.
 
 ### Contract tests against a live Node
 

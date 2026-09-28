@@ -280,6 +280,7 @@ A pure function: `evaluate(tool_call, session, state, policy_view_facts) → Pol
 | `INVALID_REQUEST` | Node 422 not about the destination (e.g. a credit card as a transfer source), or an unexpected decline code | deny (explain) |
 | `CUSTOMER_REQUEST` | Customer asks for a person (`handoff_to_human`) | escalate |
 | `ASSISTANT_FAILURE` | The model failed after retries, refused, or returned an unusable answer | escalate |
+| `BANK_UNAVAILABLE` | Node timed out, failed (5xx) or answered malformed data, after the client's retries | escalate (safe message) |
 | `OUTCOME_UNKNOWN` | A payment timed out and reconciliation can't find it | escalate, never retry |
 | `VERIFY_MISMATCH` | The read-back doesn't match the confirmed action | escalate |
 | `LIMIT_REACHED` | Max tool steps or clarifications | escalate |
@@ -344,7 +345,7 @@ The handoff is built by **code** from the state, not written freely by the model
 | Read retries | Max 2 with exponential backoff for reads, session checks and LLM calls |
 | Write retries | **None**, until Node supports idempotency keys (R2). After R2: at most 1 retry, with the same key |
 | Reconciliation | After a payment times out or fails with a 5xx, list the source product's simulated transactions since the confirmation, and match the method, amount and currency. Found → `verify`. Not found → `OUTCOME_UNKNOWN` handoff. The customer is told the result is unknown, not that it failed |
-| Tool failure | After retries, the tool returns an error result. The agent explains and offers a human; the handoff includes what is known |
+| Bank failure | After the client's read retries, a timeout, 5xx or malformed answer from Node ends the turn with a safe message and a handoff (`BANK_UNAVAILABLE`) that includes what is known. The model doesn't improvise around a missing answer. During a payment, see reconciliation |
 | LLM failure / refusal | Safe message + handoff |
 | Budgets | Max 6 tool steps per turn, 2 clarifications per conversation, `max_tokens` per call |
 | Confirmation | Pending actions expire after 5 minutes and execute at most once. The action is marked `executed` in state before Node is called |
@@ -394,14 +395,15 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
 ## 15. Deployment & configuration
 
 - **Docker Compose:** an `ai-backend` service next to `db`, `api` and `frontend` in the root `docker-compose.yml`:
-  - Port 8000.
+  - Port 8000; the image runs as a non-root user and is healthy only when `/v1/health` is.
   - `BANK_MODE=http` and `BANK_BASE_URL=http://api:3000`.
-  - `DB_URL` pointing at the `ai_backend` database, which an init script creates.
+  - `DB_URL=postgresql://…/ai_backend`. The service creates that database on startup if it's missing (Postgres init scripts only run on a fresh volume, so teammates' existing volumes would never get it). One connection pool serves the LangGraph checkpointer and the stores; an advisory lock keeps one turn at a time per conversation across servers.
   - CORS open to the frontend origin.
-  - The frontend reaches the service from the browser, so it gets the AI backend's URL as a build argument.
+  - The model settings come from `ai-backend/.env` if present.
+  - The frontend reaches the service from the browser, so it gets the AI backend's URL as a build argument (see `CHAT_API.md`).
 - **Offline:** the same image runs with `BANK_MODE=fake` (fixture data) and SQLite for tests and eval.
 - **Config:** env vars for secrets and endpoints; `config/models.yaml` and `config/policy.yaml` for behaviour.
-- **Health:** `GET /v1/health` checks the configuration, Node's `/health` and the model registry.
+- **Health:** `GET /v1/health` checks the configuration, the model registry and its credentials, Node's `/health`, and the database.
 
 ---
 
@@ -434,7 +436,7 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
 | R3 | `merchant` (case-insensitive contains), `min_amount` and `max_amount` filters on `GET /transactions` | "My Uber payment" lookups | Filter in Python |
 | R4 | Include `customer_id` in transaction and product responses | Defence-in-depth ownership check | Rely on Node's URL scoping |
 | R5 | Agree when a status reason is given. `explainStatus` gives a decline reason for `Pending`/`Reversed` rows that have a non-`00` code | The codes don't match the data (§17), so "insufficient funds" on a pending transfer misleads | The AI backend cites a reason only for `Declined` |
-| R6 | Compose: create the `ai_backend` database in `backend/docker/initdb`, and add the `ai-backend` service | Deployment | The AI team can send the PR |
+| R6 | ~~Compose: create the `ai_backend` database in `backend/docker/initdb`, and add the `ai-backend` service~~ | Deployment | **Done on the AI side (M3):** the service is in `docker-compose.yml` and creates its own database, so Node's files are untouched |
 
 ---
 
