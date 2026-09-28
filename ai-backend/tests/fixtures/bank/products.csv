@@ -1,0 +1,11 @@
+product_id,customer_id,product_type,product_number,currency,current_balance,credit_limit,interest_rate,opening_date,expiration_date,product_status,days_past_due
+PRD-ACHK,CLI-AAAA1111,Cuenta Corriente,1111222233,USD,1500.00,,0.32,2020-01-01,,Active,
+PRD-ASAV,CLI-AAAA1111,Cuenta Ahorro,1111222244,USD,200.00,,0.31,2020-01-01,,Active,
+PRD-ACC,CLI-AAAA1111,Tarjeta Crédito,4321,USD,1200.50,5000.00,34.5,2023-02-01,2028-01-31,Active,0.0
+PRD-AOLD,CLI-AAAA1111,Tarjeta Débito,9876,USD,300.00,,0.0,2021-01-31,2024-01-31,Active,
+PRD-ABLK,CLI-AAAA1111,Tarjeta Débito,5555,USD,10.00,,0.0,2024-05-01,2029-05-01,Blocked,
+PRD-ACLS,CLI-AAAA1111,Cuenta Ahorro,1111222255,USD,0.00,,0.30,2019-01-01,,Closed,
+PRD-AINV,CLI-AAAA1111,Inversión,INV-000001,USD,1000.00,,5.5,2022-01-01,2027-01-01,Active,
+PRD-BCHK,CLI-BBBB2222,Cuenta Corriente,2222333344,COP,2500000.00,,0.31,2019-03-03,,Active,
+PRD-BLOAN,CLI-BBBB2222,Préstamo Personal,LOAN-000001,COP,900000.00,1000000.00,19.9,2024-04-04,,Active,30.0
+PRD-CSAV,CLI-CCCC3333,Cuenta Ahorro,3333444455,USD,50.00,,0.30,2020-01-01,,Active,

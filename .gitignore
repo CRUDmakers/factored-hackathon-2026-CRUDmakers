@@ -80,3 +80,8 @@ htmlcov/
 mlruns/
 wandb/
 .cache/
+
+# ai-backend local artifacts
+ai-backend/*.db
+*.part
+*eval/

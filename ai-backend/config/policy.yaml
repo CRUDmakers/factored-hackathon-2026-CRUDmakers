@@ -1,0 +1,14 @@
+# Initial values. Thresholds are tuned on the train split only (ARCHITECTURE §9, §14).
+limits:
+  max_tool_steps_per_turn: 6
+  max_clarifications: 2
+  confirmation_ttl_seconds: 300
+  write_amount_limit_usd: 5000
+thresholds:
+  fraud_score_escalate: 40          # fraud median 48.6 vs non-fraud 15.0 (H1 2025); tune on train split only
+  repeat_contact_window_days: 7
+  repeat_contact_count: 2
+routing:
+  human_confidence_tau: 0.80        # set from classifier validation (human-route recall >= 0.95)
+timeouts_seconds: {bank: 3, llm: 30}
+retries: {max: 2, backoff_base_seconds: 0.5}

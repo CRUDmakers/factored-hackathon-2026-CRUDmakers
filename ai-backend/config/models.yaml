@@ -1,0 +1,45 @@
+# Model registry. AGENT_MODEL / JUDGE_MODEL pick entries by key.
+# price_per_mtok is USD per million tokens; null until copied from the provider's pricing page.
+# Effort/thinking params: verify how langchain-anthropic passes them before adding (M1).
+models:
+  claude-opus-5-5:
+    provider: anthropic
+    model: claude-opus-5-5
+    params: {max_tokens: 4096}
+    price_per_mtok: null
+    capabilities: [tools, prompt_caching]
+  claude-sonnet-5:
+    provider: anthropic
+    model: claude-sonnet-5
+    params: {max_tokens: 4096}
+    price_per_mtok: null
+    capabilities: [tools, prompt_caching]
+  claude-haiku-4-5:
+    provider: anthropic
+    model: claude-haiku-4-5
+    params: {max_tokens: 4096}
+    price_per_mtok: null
+    capabilities: [tools, prompt_caching]
+  # Development: Gemini through a local 9router (OpenAI-compatible, OPENAI_COMPAT_BASE_URL).
+  # Checked 2026-09-28: tool calling works; temperature 0 is accepted; the router adds ~2.1k
+  # hidden prompt tokens per call, so latency and token counts are not comparable with a
+  # direct provider. Not usable for the final eval or the deployment (ARCHITECTURE §16).
+  gemini-3.8-flash:
+    provider: openai_compatible
+    model: ag/gemini-3.8-flash
+    params: {max_tokens: 4096, temperature: 0}
+    price_per_mtok: null
+    capabilities: [tools]
+  gemini-3.1-pro-low:
+    provider: openai_compatible
+    model: ag/gemini-3.1-pro-low
+    params: {max_tokens: 4096, temperature: 0}
+    price_per_mtok: null
+    capabilities: [tools]
+  # Open model: provider and model name are open decision #4 (ARCHITECTURE §16).
+  # open-model-1:
+  #   provider: openai_compatible
+  #   model: "<name served by the endpoint>"
+  #   params: {max_tokens: 4096, temperature: 0}
+  #   price_per_mtok: {input: 0.0, output: 0.0}
+  #   capabilities: [tools]
