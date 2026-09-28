@@ -2,7 +2,9 @@
 
 Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
 
-**Status:** M3. Runs in Docker Compose next to Node, Postgres and the frontend (below). Chat API for the frontend: `CHAT_API.md`.
+**Status:** M4. A route classifier triages each message before the agent (direct handoff, refusal, or a note for the agent): data, split, baseline, model and report in `classifier_data/` (start with `report.md`).
+
+**M3:** Runs in Docker Compose next to Node, Postgres and the frontend (below). Chat API for the frontend: `CHAT_API.md`.
 
 **M2:** The assistant answers from the bank (read tools), makes transfers and bill payments (Node's preview → the customer confirms → executed once → verified by read-back, with reconciliation after a timeout), and hands off to a human with a structured record (`GET /v1/handoffs/{id}`), all under a code-enforced policy engine. M0 (bank layer, fixture, contract tests) is below.
 
@@ -71,6 +73,16 @@ In http mode, the AI backend checks every session with Node (`GET /auth/sessions
 .venv/bin/python -m eval.fixtures.download --start 2025-12-20 --end 2026-06-17   # into ../data (gitignored)
 .venv/bin/python -m eval.fixtures.extract
 ```
+
+## Route classifier
+
+```bash
+.venv/bin/python -m ai_backend.classifier.dataset   # templates.yaml → utterances.csv (with checks)
+.venv/bin/python -m ai_backend.classifier.split     # only for a new dataset: the split is frozen
+.venv/bin/python -m ai_backend.classifier.train     # → models/route_classifier.joblib + report.md
+```
+
+The trained model is committed and shipped as is, because retraining on another platform can pick different hyperparameters. The embedding weights (~240 MB) are downloaded on first use into `models/fastembed/`. Set `CLASSIFIER_PATH=` (empty) to run without the classifier.
 
 ## Test
 

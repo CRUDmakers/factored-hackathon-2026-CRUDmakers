@@ -318,8 +318,7 @@ Reason codes are as in ARCHITECTURE §9. `evaluate`, first match wins:
 |---|---|
 | `auth_guard` | `bank.get_session(token)`, then the conversation-ownership check. It runs in the API layer **before** the graph (`agent/service.py`), so a bad token or someone else's conversation ID never loads or writes a checkpoint. It is still recorded as the turn's first trace event. A 401 → `login_required`. **No LLM call.** |
 | `intake` | First node of every turn. With a pending payment: approve → `mark_executing` (or `reconcile` if it was already marked executed); reject → cancelled; expired → cancelled with a message; any other message → the payment is dropped and the turn continues to `preprocess`. Without one → `preprocess`. |
-| `preprocess` | Language detection (`es`/`pt`/`other`), classifier route + confidence (M4), and the repeat-contact check (M4). `other` → reply in ES and PT that only those languages are supported. Mixed or unclear → keep the previous conversation language. |
-| `route` | (M4) `human` with confidence ≥ τ, or `REPEAT_CONTACT` → `handoff`. `out_of_scope` → refuse + redirect. Else → `agent`. |
+| `preprocess` | Language detection (`es`/`pt`/`other`); `other` → reply in ES and PT that only those languages are supported. Mixed or unclear → keep the previous conversation language. Then the classifier's triage (§10): direct handoff, repeat contact (≥ 2 earlier conversations in 7 days about `follow_up` or `decline_reason`; routine intents never count), confident out of scope → refusal, or a routing note for the agent (possible human, clarify). The decision is traced as a `route` event. |
 | `agent` | Call the chat model with the system prompt (versioned), history and tools. Final text → `respond`; tool calls → `policy_gate`. Provider error after retries, refusal, an answer without usage, or an empty answer → `handoff` with `ASSISTANT_FAILURE`. |
 | `policy_gate` | `policy.evaluate` for each tool call. Escalations → `handoff`; the first write → `prepare_write`; allowed reads → `tools`; denials are answered to the model as error results. Every tool call gets an answer, so the history stays valid. |
 | `tools` | Execute allowed reads (in parallel). Tool errors become error results, never exceptions to the user. A 403 from Node → `handoff` with `CROSS_CUSTOMER`, never data for the model. |
@@ -344,7 +343,7 @@ Reason codes are as in ARCHITECTURE §9. `evaluate`, first match wins:
 4. A pending action executes **at most once**: turns of one conversation run one at a time (a per-conversation lock), and `executed` is saved before the bank is called.
 5. **If Node declines at execution** (for example, the balance changed after the preview), `verify` reports the decline. The payment is never retried.
 
-### 8.3 System prompt requirements (`prompts/system_v2.md`; `system_v1.md` was the M1 read path)
+### 8.3 System prompt requirements (`prompts/system_v3.md`: v2 plus the routing note; v1 was the M1 read path)
 
 The system prompt must:
 - Define the role (Banco LATAM transactional assistant) and the scope (in/out list from ARCHITECTURE §8).
@@ -397,19 +396,26 @@ Tool results are passed to the model as structured JSON inside a clearly labelle
 
 ## 10. Route classifier (learned component)
 
+Implemented in M4; results in `classifier_data/report.md`.
+
 - **Labels:**
-  - `route`: `answer | clarify | human | out_of_scope`
-  - `intent` (optional second head): `balance | tx_status | decline_reason | recent_tx | fx | product_info | transfer | bill_payment | follow_up | spending | other`
-- **Dataset (`classifier_data/utterances.csv`):**
-  - Columns: `text, lang, route, intent, template_id, author`.
-  - At least 600 rows, at least 40% Portuguese, every route label covered.
-  - Team-written; this is documented as team-generated data. Anything a model generated is labelled as such in `author`.
-- **Split:** `GroupShuffleSplit` by `template_id` into train/validation/test. **The test set is frozen** in a file before any tuning.
+  - `route`: `answer | clarify | human | out_of_scope` (definitions in `classifier_data/README.md`)
+  - `intent` (second head): `balance | tx_status | decline_reason | recent_tx | fx | product_info | transfer | bill_payment | follow_up | spending | other`
+- **Dataset:**
+  - `classifier_data/templates.yaml` is the source; `utterances.csv` is generated from it (`python -m ai_backend.classifier.dataset`, which also checks the rules below).
+  - Columns: `text, lang, route, intent, template_id, author`. At least 600 rows, at least 40% Portuguese, every route covered.
+  - **Model-drafted**, not team-written: every row has `author = model:claude-opus-5-5`, documented in the README and the report. The dataset has no Portuguese and its transcripts are two fixed sentences, so it can't supply training text.
+- **Split:** `StratifiedGroupKFold` by `template_id` (families never cross splits; routes stratified), about 60/20/20. **Frozen** in `split.json` before any tuning, with a hash of the CSV; training refuses a changed dataset.
 - **Baseline:** `baseline_rules.py`, keyword rules per route.
-- **Model:** multilingual sentence embeddings (for example `intfloat/multilingual-e5-small`) + `LogisticRegression(class_weight="balanced")`.
-- **Threshold τ:** the smallest value on validation where human-route recall ≥ 0.95, saved to `policy.yaml`.
-- **Report:** per-class precision/recall/F1, macro-F1, human-route recall and false positives, per-language breakdown, confusion matrix. Baseline vs model on the same test set.
-- **Artifacts:** `*.joblib` is gitignored, so the model must be reproducible with `python -m ai_backend.classifier.train`. The Docker build runs training (or the artifact is published separately).
+- **Model:** multilingual sentence embeddings (`paraphrase-multilingual-MiniLM-L12-v2`, run with **fastembed** on ONNX Runtime: no PyTorch in the image) and/or accent-insensitive character n-grams, + `LogisticRegression(class_weight="balanced")`. The feature set and C are chosen on validation.
+- **Thresholds, all on validation:**
+  - τ (flag): the **largest** value of P(human) that keeps human-route recall ≥ 0.95. (v0.2 said "smallest", which would send everything to a human.)
+  - Direct handoff: the smallest P(human) with precision ≥ 0.90.
+  - Out-of-scope refusal: the smallest out-of-scope confidence with precision ≥ 0.90.
+  - They are **stored with the model**, so a model and its thresholds can't drift apart; `policy.yaml` `routing` can override them (null by default).
+- **Runtime (`preprocess`):** direct handoff (`HUMAN_ROUTE`) → repeat contact (`REPEAT_CONTACT`) → confident out of scope (refusal) → flag "possibly needs a human" in the agent's prompt → clarify (a note in the prompt; the third clarify turn in a row hands off with `LIMIT_REACHED`) → answer. A flag costs nothing when wrong (the agent answers normally); the direct paths skip the agent, so they need high precision.
+- **Report:** per-class precision/recall/F1, macro-F1, human-route recall with a 95% interval and false positives, per-language breakdown, confusion matrices, the triage results, the test errors, and the run history. Baseline vs model on the same test split.
+- **Artifact:** `models/route_classifier.joblib` (<1 MB) is **committed**, and the Docker image ships it as is. Retraining on another platform (e.g. Linux vs macOS) produced slightly different embeddings and picked a different C, so the deployed model must be the reported one. `python -m ai_backend.classifier.train` reproduces it on the same platform; the embedding weights (~240 MB) are downloaded, never committed.
 
 ---
 
@@ -491,7 +497,7 @@ Only for response quality (clarity, tone, language correctness). Its rubric is w
 | **M1** | Sep 29 | Read path: `auth_guard` (Node session check), preprocess (language only), agent + P0 read tools, respond, traces | ES and PT "did my payment go through?" answered from the fixture; the trace shows the tool calls; expired and revoked sessions give `login_required` with no LLM call |
 | **M2** | Sep 30 | Policy engine; `transfer_money` and `pay_bill` with prepare → confirm → execute → reconcile → verify; escalation_check; handoff builder | 100% branch coverage on policy; payment flow tested for approve, reject, expiry, preview decline (`51`/`54`/`05`/`14`), 422, execute timeout found and not found by reconciliation, and verify mismatch; handoff JSON validates against the schema; fraud-flagged / blocked / delinquent fixtures hand off |
 | **M3** | Oct 1 | Integration: Compose service (the database creates itself on startup), Postgres checkpointer and stores with an advisory lock, CORS, chat contract for the frontend (`CHAT_API.md`), Node failures → `BANK_UNAVAILABLE` handoff, smoke tests against live Node | `docker compose up` runs db + api + ai-backend + frontend; a live-Node smoke run passes; Node timeout and 500 lead to a safe message + handoff |
-| **M4** | Oct 1–2 | Classifier dataset, baseline, model, τ, wired into `preprocess`; repeat-contact check | Classifier report committed; test split frozen; human-route recall ≥ 0.95 on validation |
+| **M4** | Oct 1–2 | Classifier dataset, baseline, model, thresholds, wired into `preprocess`; repeat-contact check | Classifier report committed; test split frozen; human-route recall ≥ 0.95 on validation (0.96, 24/25) |
 | **M5** | Oct 2–3 | Eval harness, ≥ 200 scenarios, B0/B1/S runs × 3, model comparison, judge validation | Report with all §11.3 metrics and denominators; error analysis section listing failures |
 | **M6** | Oct 4 | Deploy, README (setup, run, eval, limitations), P1 tools if time allows | Deployed URL answers `/v1/health` and a chat turn against the deployed Node |
 

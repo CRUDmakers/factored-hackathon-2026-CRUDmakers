@@ -7,3 +7,5 @@ __pycache__
 .coverage
 tests
 eval
+models/fastembed
+classifier_data

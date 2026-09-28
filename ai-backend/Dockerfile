@@ -13,7 +13,14 @@ COPY src ./src
 RUN pip install --no-deps .
 COPY config ./config
 
-RUN useradd --create-home --uid 10001 app
+# The route classifier: the committed, reported model (retraining on another platform can pick
+# different hyperparameters). Only the embedding weights are fetched here, so nothing is
+# downloaded at runtime.
+COPY models/route_classifier.joblib ./models/route_classifier.joblib
+RUN python -c "from pathlib import Path; from ai_backend.classifier.predict import \
+FastEmbedEmbedder, EMBEDDING_MODEL; FastEmbedEmbedder(EMBEDDING_MODEL, Path('models/fastembed'))"
+
+RUN useradd --create-home --uid 10001 app && chown -R app /app/models
 USER app
 EXPOSE 8000
 # Healthy only when config, models, the bank and storage all check out (/v1/health → 200).

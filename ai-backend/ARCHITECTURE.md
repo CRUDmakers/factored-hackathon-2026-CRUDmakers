@@ -157,8 +157,9 @@ intake: a payment awaiting confirmation? approve ──► execute_write (below)
   ▼
 preprocess: detect language (es/pt) · route classifier (answer | clarify | human | out_of_scope)
   │          · repeat-contact check (assistant conversation history)
-  ├── human (confidence ≥ τ) or repeat contact ───────────────► handoff ──► respond ──► END
-  ├── out_of_scope ─────────────► respond(refuse + where to go) ──► END
+  ├── P(human) ≥ direct threshold, or repeat contact ──────────► handoff ──► respond ──► END
+  ├── confident out_of_scope ───► respond(refuse + where to go) ──► END
+  ├── P(human) ≥ τ: flag "possibly needs a human" in the agent's prompt (the agent decides)
   └── answer / clarify
         │
         ▼
@@ -275,7 +276,8 @@ A pure function: `evaluate(tool_call, session, state, policy_view_facts) → Pol
 | `UNRECOGNIZED_CHARGE` | Customer says they don't recognise a charge | escalate |
 | `DELINQUENT` | `days_past_due > 0` and customer wants to negotiate or arrange the debt. A plain payment toward the debt is allowed | escalate |
 | `FOLLOW_UP_REQUIRED` | Customer wants follow-up on a `Pending` or `Reversed` transaction (there's no case system) | escalate |
-| `REPEAT_CONTACT` | ≥ 2 earlier conversations with the assistant with the same intent in 7 days | escalate |
+| `REPEAT_CONTACT` | ≥ 2 earlier conversations with the assistant in 7 days about the same problem intent (`follow_up`, `decline_reason`) | escalate |
+| `HUMAN_ROUTE` | The route classifier's P(human) is at or above its direct-handoff threshold (precision ≥ 0.90 on validation) | escalate |
 | `ONE_ACTION_AT_A_TIME` | A second write in the same model message | deny |
 | `INVALID_REQUEST` | Node 422 not about the destination (e.g. a credit card as a transfer source), or an unexpected decline code | deny (explain) |
 | `CUSTOMER_REQUEST` | Customer asks for a person (`handoff_to_human`) | escalate |
@@ -385,10 +387,10 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
   - p50/p95 latency; cost per attempted case and per successful resolution.
   - Everything broken down by language and customer segment.
 - **Grading:** deterministic checks first (outcome, reason codes, tool calls, facts, forbidden actions, payments executed). The LLM judge is used only for response quality and is validated on ≥ 30 human-labelled cases.
-- **Learned component:** the route classifier, trained on team-labelled ES/PT utterances.
-  - Split by template family to prevent leakage.
+- **Learned component:** the route classifier (SPEC §10, `classifier_data/report.md`), trained on **model-drafted** ES/PT utterances (the dataset has none usable).
+  - Split by template family, frozen before tuning, to prevent leakage.
   - Baseline: keyword rules.
-  - Metrics: macro-F1 and **human-route recall**, which sets the threshold τ.
+  - Metrics: macro-F1 and **human-route recall**, which sets τ. On the test split the model reaches all 24 human-route cases (the baseline 18) at the cost of more flags; used as triage (direct handoff only at high precision, otherwise a flag to the agent), it made 8/8 correct direct handoffs and 10/10 correct refusals.
 
 ---
 
