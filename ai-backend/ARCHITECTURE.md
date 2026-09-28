@@ -111,6 +111,7 @@ It stores no bank data of its own. It reads and acts only through the Node mock-
 - Pin exact versions and verify APIs against current docs.
 - Anthropic models go through `langchain-anthropic` (official Anthropic SDK underneath), never through an OpenAI-compatible shim.
 - Check that prompt caching and effort settings are passed through correctly.
+- The confirmation pause is kept in the conversation state rather than with `interrupt` (SPEC §8.1), so checkpointing, not `interrupt`, is what the payment flow relies on.
 
 ### ADR-002: session validation through Node
 
@@ -151,6 +152,9 @@ START
 auth_guard: Node GET /auth/sessions/current ──(401)──► respond(login_required) ──► END
   │ ok
   ▼
+intake: a payment awaiting confirmation? approve ──► execute_write (below) · reject/expired ──► respond
+  │ nothing pending (or the customer moved on)
+  ▼
 preprocess: detect language (es/pt) · route classifier (answer | clarify | human | out_of_scope)
   │          · repeat-contact check (assistant conversation history)
   ├── human (confidence ≥ τ) or repeat contact ───────────────► handoff ──► respond ──► END
@@ -166,7 +170,7 @@ preprocess: detect language (es/pt) · route classifier (answer | clarify | huma
         │  ├── allow (read) ────────► run_read_tools ──► escalation_check ──► agent
         │  └── confirm (write) ─────► prepare_write (Node dry run) ──► policy_gate on the preview
         │                                ├── declined / invalid ──► (error result back to agent) or handoff
-        │                                └── ok ──► confirm ⏸ interrupt (customer sees Node's preview)
+        │                                └── ok ──► turn ends: awaiting confirmation (Node's preview)
         │                                             ├── rejected / expired ──► agent
         │                                             └── approved ──► execute_write ──► verify ──► escalation_check ──► agent
         │                                                                 └── timeout / 5xx ──► reconcile ──► verify, or handoff
@@ -262,7 +266,7 @@ A pure function: `evaluate(tool_call, session, state, policy_view_facts) → Pol
 | `AUTH_EXPIRED` | Node answers 401 (`unauthorized`, `session_expired`, `session_revoked`) | deny → ask to log in again |
 | `TOOL_UNKNOWN` | Tool not in registry | deny |
 | `WRITE_NEEDS_CONFIRMATION` | Any write whose Node preview is approved | confirm |
-| `AMOUNT_OVER_LIMIT` | Write amount in USD (converted in code) > limit | escalate |
+| `AMOUNT_OVER_LIMIT` | Previewed amount in USD (converted in code) > limit, or no USD rate | escalate |
 | `INSUFFICIENT_FUNDS` | Preview declined with `51` | deny (explain, offer another source) |
 | `CARD_EXPIRED` | Preview declined with `54` | deny (explain) |
 | `INVALID_DESTINATION` | Preview declined with `14`, or Node 422 on the destination or barcode | deny (ask to correct; counts as a clarification) |
@@ -272,6 +276,10 @@ A pure function: `evaluate(tool_call, session, state, policy_view_facts) → Pol
 | `DELINQUENT` | `days_past_due > 0` and customer wants to negotiate or arrange the debt. A plain payment toward the debt is allowed | escalate |
 | `FOLLOW_UP_REQUIRED` | Customer wants follow-up on a `Pending` or `Reversed` transaction (there's no case system) | escalate |
 | `REPEAT_CONTACT` | ≥ 2 earlier conversations with the assistant with the same intent in 7 days | escalate |
+| `ONE_ACTION_AT_A_TIME` | A second write in the same model message | deny |
+| `INVALID_REQUEST` | Node 422 not about the destination (e.g. a credit card as a transfer source), or an unexpected decline code | deny (explain) |
+| `CUSTOMER_REQUEST` | Customer asks for a person (`handoff_to_human`) | escalate |
+| `ASSISTANT_FAILURE` | The model failed after retries, refused, or returned an unusable answer | escalate |
 | `OUTCOME_UNKNOWN` | A payment timed out and reconciliation can't find it | escalate, never retry |
 | `VERIFY_MISMATCH` | The read-back doesn't match the confirmed action | escalate |
 | `LIMIT_REACHED` | Max tool steps or clarifications | escalate |

@@ -2,7 +2,7 @@
 
 Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
 
-**Status:** M1 (read path): `POST /v1/chat` answers from the bank with the P0 read tools, in Spanish or Portuguese, with a trace per turn. M0 (bank layer, fixture, contract tests) is below.
+**Status:** M2. The assistant answers from the bank (read tools), makes transfers and bill payments (Node's preview → the customer confirms → executed once → verified by read-back, with reconciliation after a timeout), and hands off to a human with a structured record (`GET /v1/handoffs/{id}`), all under a code-enforced policy engine. M0 (bank layer, fixture, contract tests) is below.
 
 ## Setup
 
@@ -28,6 +28,13 @@ Chat (the token is a Node session token; in fake mode, tests and the eval issue 
 curl -s localhost:8000/v1/chat -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
   -d '{"message": "Meu pagamento de ontem na Uber foi aprovado?"}'
 curl -s localhost:8000/v1/conversations/<conversation_id>/trace -H "Authorization: Bearer <token>"
+```
+
+Confirming a payment (the previous response had `status: "awaiting_confirmation"`):
+
+```bash
+curl -s localhost:8000/v1/chat -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"conversation_id": "<id>", "confirmation": {"action_id": "<pending_action.action_id>", "decision": "approve"}}'
 ```
 
 The agent model comes from `AGENT_MODEL` in `.env` (see `.env.example`; development uses Gemini through a local 9router). `CLOCK_OVERRIDE` pins "today" for the fake bank and the agent, for reproducible runs.
@@ -62,7 +69,7 @@ In http mode, the AI backend checks every session with Node (`GET /auth/sessions
 
 ### Live model tests
 
-`tests/live/` runs the M1 acceptance questions (ES and PT, answered from the real fixture) against the model configured in `.env`. They're excluded by default because they call the model:
+`tests/live/` runs the M1 and M2 acceptance cases (ES and PT questions, payments with confirmation, a handoff; real fixture) against the model configured in `.env`. They're excluded by default because they call the model:
 
 ```bash
 .venv/bin/python -m pytest -m llm tests/live -s   # -s prints each answer, its tools, tokens and latency

@@ -21,7 +21,12 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from ai_backend.agent import messages as text
 from ai_backend.agent.graph import build_graph
-from ai_backend.agent.service import ChatService, ConversationNotFound, LoginRequired
+from ai_backend.agent.service import (
+    ChatService,
+    ConversationNotFound,
+    HandoffNotFound,
+    LoginRequired,
+)
 from ai_backend.api.schemas import (
     ChatRequest,
     ChatResponse,
@@ -46,6 +51,8 @@ from ai_backend.conversations.store import (
     MemoryConversationStore,
     SqliteConversationStore,
 )
+from ai_backend.handoff.models import Handoff
+from ai_backend.handoff.store import HandoffStore, MemoryHandoffStore, SqliteHandoffStore
 from ai_backend.llm.registry import ModelNotConfigured, build_chat_model
 from ai_backend.observability.store import MemoryTraceStore, SqliteTraceStore, TraceStore
 from ai_backend.settings import Settings, get_settings
@@ -68,15 +75,18 @@ def make_clock(settings: Settings) -> Callable[[], datetime]:
 
 
 async def build_state(
-    settings: Settings, stack: AsyncExitStack, llm: BaseChatModel | None = None
+    settings: Settings,
+    stack: AsyncExitStack,
+    llm: BaseChatModel | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> AppState:
     """Load everything the app needs. Invalid config fails here, so the app never starts broken.
 
-    `llm` replaces the configured agent model (tests use a scripted one).
+    `llm` replaces the configured agent model and `clock` the configured clock (tests).
     """
     models = load_model_registry(settings.models_config_path)
     policy = load_policy_config(settings.policy_config_path)
-    clock = make_clock(settings)
+    clock = clock or make_clock(settings)
 
     bank: BankClient
     if settings.bank_mode == "fake":
@@ -88,7 +98,7 @@ async def build_state(
         stack.push_async_callback(http.aclose)
         bank = http
 
-    checkpointer, conversations, traces = await _storage(settings, stack)
+    checkpointer, conversations, traces, handoffs = await _storage(settings, stack)
 
     spec = models.get(settings.agent_model)
     problem = None
@@ -114,6 +124,7 @@ async def build_state(
             policy=policy,
             conversations=conversations,
             traces=traces,
+            handoffs=handoffs,
             clock=clock,
             history_end=settings.history_end,
         )
@@ -122,27 +133,31 @@ async def build_state(
 
 async def _storage(
     settings: Settings, stack: AsyncExitStack
-) -> tuple[BaseCheckpointSaver, ConversationStore, TraceStore]:
+) -> tuple[BaseCheckpointSaver, ConversationStore, TraceStore, HandoffStore]:
     url = settings.db_url
     if url == "memory://":
-        return InMemorySaver(), MemoryConversationStore(), MemoryTraceStore()
+        return InMemorySaver(), MemoryConversationStore(), MemoryTraceStore(), MemoryHandoffStore()
     if url.startswith("sqlite:///"):
         path = Path(url.removeprefix("sqlite:///"))
         path.parent.mkdir(parents=True, exist_ok=True)
         checkpointer = await stack.enter_async_context(AsyncSqliteSaver.from_conn_string(str(path)))
         trace_store = SqliteTraceStore(path)
         await trace_store.purge_older_than(settings.trace_retention_days)
-        return checkpointer, SqliteConversationStore(path), trace_store
+        return checkpointer, SqliteConversationStore(path), trace_store, SqliteHandoffStore(path)
     raise ConfigError(f"unsupported DB_URL {url!r} (use sqlite:///<path> or memory://)")
 
 
-def create_app(settings: Settings | None = None, llm: BaseChatModel | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    llm: BaseChatModel | None = None,
+    clock: Callable[[], datetime] | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with AsyncExitStack() as stack:
-            app.state.ai = await build_state(settings, stack, llm)
+            app.state.ai = await build_state(settings, stack, llm, clock)
             yield
 
     app = FastAPI(title="Banco LATAM AI backend", version="0.1.0", lifespan=lifespan)
@@ -176,9 +191,10 @@ def create_app(settings: Settings | None = None, llm: BaseChatModel | None = Non
         state: AppState = request.app.state.ai
         if state.service is None:
             return _error(503, "model_unavailable", "The assistant model is not configured.")
+        confirmation = body.confirmation.model_dump() if body.confirmation else None
         try:
             result = await state.service.turn(
-                _bearer(authorization), body.message, body.conversation_id
+                _bearer(authorization), body.message, body.conversation_id, confirmation
             )
         except LoginRequired:
             return _login_required()
@@ -188,7 +204,16 @@ def create_app(settings: Settings | None = None, llm: BaseChatModel | None = Non
             return _error(503, "bank_unavailable", "The bank could not answer right now.")
         if result.status == "login_required":
             return _login_required()
-        return ChatResponse(**result.__dict__)
+        return ChatResponse(
+            conversation_id=result.conversation_id,
+            turn_id=result.turn_id,
+            status=result.status,
+            message=result.message,
+            language=result.language,
+            pending_action=result.pending_action,
+            handoff={"handoff_id": result.handoff_id} if result.handoff_id else None,
+            trace_id=result.trace_id,
+        )
 
     @app.get(
         "/v1/conversations/{conversation_id}/trace",
@@ -208,6 +233,26 @@ def create_app(settings: Settings | None = None, llm: BaseChatModel | None = Non
         except ConversationNotFound:
             return _error(404, "conversation_not_found", "No such conversation.")
         return TraceResponse(conversation_id=conversation_id, events=events)
+
+    @app.get(
+        "/v1/handoffs/{handoff_id}",
+        response_model=Handoff,
+        responses={401: {"model": LoginRequiredResponse}, 404: {"model": ErrorResponse}},
+    )
+    async def get_handoff(
+        handoff_id: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> Any:
+        """The handoff record, for the human-agent panel (the customer's own, until agent roles
+        exist)."""
+        state: AppState = request.app.state.ai
+        if state.service is None:
+            return _error(503, "model_unavailable", "The assistant model is not configured.")
+        try:
+            return await state.service.handoff(_bearer(authorization), handoff_id)
+        except LoginRequired:
+            return _login_required()
+        except HandoffNotFound:
+            return _error(404, "handoff_not_found", "No such handoff.")
 
     return app
 

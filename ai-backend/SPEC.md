@@ -277,28 +277,30 @@ Tool schemas are strict (no extra properties). Descriptions state when to use th
 
 ## 7. Policy engine (`policy/`)
 
-- `evaluate(call: ToolCall, session: Session, state: AgentState, facts: PolicyFacts) -> PolicyDecision`
-- `check_preview(call, preview: PaymentResult | BankRejected, state) -> PolicyDecision`, used after `prepare_write`.
-- `post_tool_checks(results, session, state) -> list[PolicyDecision]`, used by `escalation_check`.
-- `PolicyDecision {decision: allow|confirm|deny|escalate, reason_code: ReasonCode, message_key: str, details: dict}`
+Pure functions over plain inputs, so they can be tested exhaustively:
 
-Rules and reason codes are exactly as in ARCHITECTURE §9. Rule order for `evaluate` is first match wins:
+- `evaluate(call: ToolCall, facts: TurnFacts, config: PolicyConfig) -> PolicyDecision`, for every tool call (`policy_gate`). `TurnFacts` holds the time, the session's expiry, the step and clarification counters, and whether Node refused a record this turn.
+- `check_preview(rejection_code, status, response_code, amount_usd, config) -> PolicyDecision`, after Node's dry run (`prepare_write`). The USD value is computed in code with Node's latest rate.
+- `post_tool_checks(policy_facts, config) -> list[PolicyDecision]`, after reads (`escalation_check`).
+- `verify_readback(expected, actual) -> PolicyDecision`, after a payment (`verify`).
+- `PolicyDecision {decision: allow|confirm|deny|escalate, reason_code, details}`; `message_key` is derived from the reason code.
 
-1. Session validity
-2. Unknown tool
-3. Cross-customer
-4. Budget limits
-5. Write amount limit (converted to USD in code)
-6. Write → preview needed (`prepare_write`)
+Reason codes are as in ARCHITECTURE §9. `evaluate`, first match wins:
+
+1. Session validity (`AUTH_EXPIRED`)
+2. Unknown tool (`TOOL_UNKNOWN`)
+3. Cross-customer: Node refused a record earlier in this turn (`CROSS_CUSTOMER`)
+4. Budget: tool steps, then clarifications (`LIMIT_REACHED`)
+5. `handoff_to_human` → its reason (`UNRECOGNIZED_CHARGE`, `DELINQUENT`, `FOLLOW_UP_REQUIRED`, `CUSTOMER_REQUEST`)
+6. Write: the first one in a model message → preview (`WRITE_NEEDS_CONFIRMATION`); any other → `ONE_ACTION_AT_A_TIME`
 7. Otherwise allow
 
-`check_preview`, in order:
-1. `BankRejected` → `INVALID_DESTINATION`, or a correctable error for other 422 codes
-2. Declined `05` → `PRODUCT_BLOCKED`
-3. `51` → `INSUFFICIENT_FUNDS`
-4. `54` → `CARD_EXPIRED`
-5. `14` → `INVALID_DESTINATION`
-6. Otherwise `WRITE_NEEDS_CONFIRMATION`
+`check_preview`, first match wins (the amount limit is checked here, on Node's own figures, because the amount's currency may only be known after the preview):
+
+1. Node rejected the request (422): destination errors → `INVALID_DESTINATION`; others → `INVALID_REQUEST`
+2. Amount in USD > `write_amount_limit_usd`, or no USD rate → `AMOUNT_OVER_LIMIT` (escalate)
+3. Declined `05` → `PRODUCT_BLOCKED` (escalate); `51` → `INSUFFICIENT_FUNDS`; `54` → `CARD_EXPIRED`; `14` → `INVALID_DESTINATION`; other codes → `INVALID_REQUEST`
+4. Otherwise `WRITE_NEEDS_CONFIRMATION`
 
 **Acceptance:**
 - Pure functions, **100% branch coverage** in unit tests.
@@ -314,31 +316,34 @@ Rules and reason codes are exactly as in ARCHITECTURE §9. Rule order for `evalu
 | Node | Behaviour |
 |---|---|
 | `auth_guard` | `bank.get_session(token)`, then the conversation-ownership check. It runs in the API layer **before** the graph (`agent/service.py`), so a bad token or someone else's conversation ID never loads or writes a checkpoint. It is still recorded as the turn's first trace event. A 401 → `login_required`. **No LLM call.** |
-| `preprocess` | Language detection (`es`/`pt`/`other`), classifier route + confidence, and the repeat-contact check against the conversation store. `other` → reply in ES and PT that only those languages are supported. Mixed or unclear → keep the previous conversation language. |
-| `route` | `human` with confidence ≥ τ, or `REPEAT_CONTACT` → `handoff`. `out_of_scope` → refuse + redirect. Else → `agent`. |
-| `agent` | Call the chat model with the system prompt (versioned), history and tools. Final text → `respond`; tool calls → `policy_gate`. Refusal / error after retries → `handoff` with `LIMIT_REACHED` or a safe failure. |
-| `policy_gate` | `policy.evaluate` for each tool call → allow / preview / deny / escalate. |
-| `run_read_tools` | Execute allowed reads (parallel where independent). Tool errors become error results, never exceptions to the user. |
-| `prepare_write` | `bank.preview_payment` → `policy.check_preview`. Declines and 422s go back to the agent as error results, or to `handoff`. |
-| `confirm` | Graph interrupt. Store `pending_action` (id, method, args, Node's preview, summary in the customer's language, idempotency key, expiry). Resume with approve / reject; expired → treat as reject. |
-| `execute_write` | Set `pending_action.executed = true` in state, then call `bank.execute_payment` **once**. Timeout / 5xx → `reconcile`. |
-| `reconcile` | `list_transactions(product_id=source, origin="simulated", date_from=today)`. Match method, amount and currency after the confirmation time. Found → `verify`; not found → `handoff` with `OUTCOME_UNKNOWN`. |
-| `verify` | `get_transaction(transaction_id)`. Compare method, amount, currency and source product with the confirmed action. `Approved` → report done; `Declined` → report the decline; mismatch or read failure → `handoff` with `VERIFY_MISMATCH`. |
-| `escalation_check` | `policy.post_tool_checks` on policy-view facts → possibly `handoff`. |
-| `handoff` | `handoff.builder.build(state)` → persist → customer message in their language with the reference. |
-| `respond` | Final message + trace flush + conversation index update (intent, outcome). |
+| `intake` | First node of every turn. With a pending payment: approve → `mark_executing` (or `reconcile` if it was already marked executed); reject → cancelled; expired → cancelled with a message; any other message → the payment is dropped and the turn continues to `preprocess`. Without one → `preprocess`. |
+| `preprocess` | Language detection (`es`/`pt`/`other`), classifier route + confidence (M4), and the repeat-contact check (M4). `other` → reply in ES and PT that only those languages are supported. Mixed or unclear → keep the previous conversation language. |
+| `route` | (M4) `human` with confidence ≥ τ, or `REPEAT_CONTACT` → `handoff`. `out_of_scope` → refuse + redirect. Else → `agent`. |
+| `agent` | Call the chat model with the system prompt (versioned), history and tools. Final text → `respond`; tool calls → `policy_gate`. Provider error after retries, refusal, an answer without usage, or an empty answer → `handoff` with `ASSISTANT_FAILURE`. |
+| `policy_gate` | `policy.evaluate` for each tool call. Escalations → `handoff`; the first write → `prepare_write`; allowed reads → `tools`; denials are answered to the model as error results. Every tool call gets an answer, so the history stays valid. |
+| `tools` | Execute allowed reads (in parallel). Tool errors become error results, never exceptions to the user. A 403 from Node → `handoff` with `CROSS_CUSTOMER`, never data for the model. |
+| `escalation_check` | `policy.post_tool_checks` on policy-view facts (fraud flag, status of the transaction's product) → possibly `handoff`. |
+| `prepare_write` | Validate the arguments, `bank.preview_payment` (dry run), then `policy.check_preview`. Denials go back to the model as error results; escalations → `handoff`. Otherwise store `pending_action` (id, method, request, Node's preview, the summary built by code, idempotency key, expiry, `executed=false`) and end the turn with `awaiting_confirmation`. |
+| `mark_executing` | Set `pending_action.executed = true`. With `durability="sync"`, this is saved before the bank is called, so a crash can never lead to a second payment. |
+| `execute_write` | Call `bank.execute_payment` **once**. Timeout / 5xx → `reconcile`. A 401 means Node didn't run it: `executed` goes back to false and the customer logs in again. |
+| `reconcile` | List the source product's simulated transactions since the confirmation (minus 60 s of clock skew) and match method, amount and currency. Found → `verify`; not found or the bank is unreachable → `handoff` with `OUTCOME_UNKNOWN`. Never re-sends. |
+| `verify` | `get_transaction(transaction_id)`, then `policy.verify_readback` on method, amount, currency and source product. Match → a result message built by code from the read-back (`Approved` with the receipt, or the decline); mismatch or read failure → `handoff` with `VERIFY_MISMATCH`. |
+| `handoff` | `handoff.builder.build(...)` from the state → persist → customer message in their language with the reference. |
+| `respond` | Final message + trace flush. |
+
+**Confirmation without an interrupt.** v0.2 planned a LangGraph `interrupt`. Instead, the pending payment lives in the conversation state and the turn ends; the next request carries the answer. A customer who writes something else then needs no second graph run, and an unanswered confirmation never leaves a graph paused mid-run. The customer still confirms before anything executes.
 
 ### 8.2 Confirmation protocol (API level)
 
 1. When a write passes its preview, `POST /v1/chat` returns `status: "awaiting_confirmation"` and `pending_action: {action_id, summary, preview, expires_at}`.
    - The summary is built by **code** from Node's preview, not written by the model.
    - It includes the amount and currency, the source product (last 4 digits), the recipient name or biller, the exchange rate and the destination amount if any, and the balance afterwards.
-2. The client resumes with `POST /v1/chat` containing `confirmation: {action_id, decision: "approve"|"reject"}`.
-3. A free-text "sí/sim/yes" or "no/não" is also mapped deterministically when a pending action exists.
-4. A pending action executes **at most once**.
+2. The client resumes with `POST /v1/chat` containing `confirmation: {action_id, decision: "approve"|"reject"}` (a `message` is optional then; the conversation records "Confirmo." / "Cancelo."). A wrong `action_id` changes nothing.
+3. A free-text "sí/sim/yes/ok/confirmo" or "no/não/cancelar" is also mapped deterministically when a pending action exists (the whole message, accents and punctuation ignored). Any other message drops the pending payment.
+4. A pending action executes **at most once**: turns of one conversation run one at a time (a per-conversation lock), and `executed` is saved before the bank is called.
 5. **If Node declines at execution** (for example, the balance changed after the preview), `verify` reports the decline. The payment is never retried.
 
-### 8.3 System prompt requirements (`prompts/system_v1.md`)
+### 8.3 System prompt requirements (`prompts/system_v2.md`; `system_v1.md` was the M1 read path)
 
 The system prompt must:
 - Define the role (Banco LATAM transactional assistant) and the scope (in/out list from ARCHITECTURE §8).
@@ -367,6 +372,7 @@ Tool steps, clarifications, timeouts and retries come from `policy.yaml`. Hittin
 |---|---|---|
 | `POST` | `/v1/chat` | `Authorization: Bearer <Node session token>`; body `ChatRequest` |
 | `GET` | `/v1/conversations/{id}/trace` | Only the conversation's customer (or an agent role) may read it |
+| `GET` | `/v1/handoffs/{handoff_id}` | The handoff record (ARCHITECTURE §10), for the human-agent panel. Only the handoff's customer until agent roles exist |
 | `GET` | `/v1/health` | Config, Node reachability, model registry |
 
 CORS allows `CORS_ORIGINS` only, with the `Authorization` header.
