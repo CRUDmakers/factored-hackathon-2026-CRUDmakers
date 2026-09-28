@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-backend"
+version = "0.1.0"
+description = "Banco LATAM transactional customer-service assistant (AI backend)"
+requires-python = ">=3.11,<3.12"
+# Agent (LangGraph/LangChain) and ML (classifier) dependencies are added and pinned in the
+# milestones that introduce them (M1 and M4), after checking their current APIs.
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn==0.54.0",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "httpx==0.28.1",
+    "structlog==26.1.0",
+    "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+# Only needed to rebuild eval/fixtures/data from the raw S3 dataset.
+fixtures = [
+    "boto3==1.43.103",
+    "python-dotenv==1.2.3",
+    "pandas==3.0.6",
+]
+dev = [
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "respx==0.23.1",
+    "ruff==0.16.9",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_backend"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["node: needs a live Node mock bank (BANK_BASE_URL, EVAL_SERVICE_KEY)"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
