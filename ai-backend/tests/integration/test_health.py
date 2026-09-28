@@ -23,6 +23,7 @@ def _settings(**overrides) -> Settings:
         bank_fixture_dir=TEST_FIXTURE,
         models_config_path=ROOT / "config" / "models.yaml",
         policy_config_path=ROOT / "config" / "policy.yaml",
+        anthropic_api_key="test-key",
     )
     base.update(overrides)
     return Settings(**base)
@@ -103,3 +104,37 @@ def test_cors_allows_the_frontend_only():
         assert ok.headers["access-control-allow-origin"] == "http://localhost:5173"
         other = client.options("/v1/health", headers={"Origin": "https://evil.test", **preflight})
         assert "access-control-allow-origin" not in other.headers
+
+
+def test_health_ok_with_openai_compatible_models():
+    r = _get_health(
+        _settings(
+            agent_model="gemini-3.8-flash",
+            judge_model="gemini-3.1-pro-low",
+            openai_compat_base_url="http://localhost:20128/v1",
+            openai_compat_api_key="test-key",
+        )
+    )
+    assert r.status_code == 200
+    assert r.json()["checks"]["models"]["detail"].startswith("agent=gemini-3.8-flash")
+
+
+@pytest.mark.parametrize(
+    ("overrides", "missing"),
+    [
+        ({"anthropic_api_key": None}, "ANTHROPIC_API_KEY"),
+        (
+            {"agent_model": "gemini-3.8-flash", "openai_compat_api_key": "k"},
+            "OPENAI_COMPAT_BASE_URL",
+        ),
+        (
+            {"judge_model": "gemini-3.1-pro-low", "openai_compat_base_url": "http://x/v1"},
+            "OPENAI_COMPAT_API_KEY",
+        ),
+    ],
+)
+def test_health_degraded_when_a_selected_provider_has_no_credentials(overrides, missing):
+    r = _get_health(_settings(**overrides))
+    assert r.status_code == 503
+    detail = r.json()["checks"]["models"]["detail"]
+    assert missing in detail and "test-key" not in detail

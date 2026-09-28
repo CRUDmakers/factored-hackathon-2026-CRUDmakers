@@ -85,12 +85,28 @@ def _check_models(state: AppState) -> Check:
     s = state.settings
     try:
         agent = state.models.get(s.agent_model)
-        state.models.get(s.judge_model)
+        judge = state.models.get(s.judge_model)
     except ConfigError as exc:
         return Check(ok=False, detail=str(exc))
     if s.agent_model == s.judge_model:
         return Check(ok=False, detail="the judge must be a different model from the agent")
+    for key, spec in ((s.agent_model, agent), (s.judge_model, judge)):
+        if missing := _missing_credentials(s, spec.provider):
+            return Check(ok=False, detail=f"{key} ({spec.provider}): {missing} is not set")
     return Check(ok=True, detail=f"agent={s.agent_model} ({agent.provider}), judge={s.judge_model}")
+
+
+def _missing_credentials(s: Settings, provider: str) -> str | None:
+    """Names of the settings a provider needs that are empty (values are never reported)."""
+    if provider == "anthropic":
+        needed = {"ANTHROPIC_API_KEY": s.anthropic_api_key}
+    else:
+        needed = {
+            "OPENAI_COMPAT_BASE_URL": s.openai_compat_base_url,
+            "OPENAI_COMPAT_API_KEY": s.openai_compat_api_key,
+        }
+    missing = [name for name, value in needed.items() if not value]
+    return ", ".join(missing) or None
 
 
 async def _check_bank(state: AppState) -> Check:
