@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: banking
+      POSTGRES_PASSWORD: banking
+      POSTGRES_DB: banking
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U banking -d banking"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Aplica as migrações e sobe a API (Swagger em http://localhost:3000/docs).
+  # A imagem roda com NODE_ENV=production: sem AUTH_JWT_SECRET e AUTH_SERVICE_KEY ela não sobe.
+  # Os valores abaixo são só para a demo local; sobrescreva via ambiente ou arquivo .env na raiz.
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://banking:banking@db:5432/banking
+      PORT: 3000
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-demo-jwt-secret-troque-fora-da-demo-local}
+      AUTH_SERVICE_KEY: ${AUTH_SERVICE_KEY:-demo-service-key}
+      AUTH_SESSION_TTL_SECONDS: ${AUTH_SESSION_TTL_SECONDS:-900}
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Carga dos CSVs de ./data (rodar uma vez): docker compose run --rm etl
+  etl:
+    build: ./backend
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/etl/cli.js"]
+    environment:
+      DATABASE_URL: postgresql://banking:banking@db:5432/banking
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["etl"]
+
+  # Testes com cobertura contra o banco banking_test: docker compose run --rm test
+  test:
+    build:
+      context: ./backend
+      target: build
+    command: ["npm", "run", "test:coverage"]
+    environment:
+      TEST_DATABASE_URL: postgresql://banking:banking@db:5432/banking_test
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["test"]
+
+  # Internet banking de demonstração (Vite + React servido por nginx): http://localhost:5173
+  # As variáveis VITE_* entram no bundle no build e são usadas pelo NAVEGADOR (por isso localhost:3000).
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:3000}
+        VITE_SERVICE_KEY: ${FRONTEND_SERVICE_KEY:-${AUTH_SERVICE_KEY:-demo-service-key}}
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

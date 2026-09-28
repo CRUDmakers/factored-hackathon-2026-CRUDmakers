@@ -1,0 +1,187 @@
+// Tabelas do dataset (branches, customers, products, daily_exchange_rates, transactions)
+// seguem as colunas dos CSVs na mesma ordem, para a carga via COPY no ETL.
+// Não há chaves estrangeiras: o dataset tem referências órfãs (ex.: produtos de
+// clientes que não estão em customers.csv).
+
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Branch {
+  branch_id           String    @id
+  branch_code         String?
+  branch_name         String?
+  branch_type         String?
+  address             String?
+  city                String?
+  state               String?
+  country             String?
+  postal_code         String?
+  geographic_zone     String?
+  phone               String?
+  email               String?
+  opening_time        String?
+  closing_time        String?
+  has_atms            Boolean?
+  atm_count           Int?
+  has_teller_windows  Boolean?
+  teller_window_count Int?
+  latitude            Float?
+  longitude           Float?
+  branch_opening_date DateTime? @db.Date
+  branch_status       String?
+
+  @@map("branches")
+}
+
+model Customer {
+  customer_id              String    @id
+  document_number          String?
+  document_type            String?
+  first_name               String?
+  last_name                String?
+  date_of_birth            DateTime? @db.Date
+  gender                   String?
+  email                    String?
+  mobile_phone             String?
+  landline_phone           String?
+  address                  String?
+  city                     String?
+  state                    String?
+  country                  String?
+  postal_code              String?
+  detected_accent          String?
+  segment                  String?
+  credit_score             Float?
+  estimated_monthly_income Decimal?  @db.Decimal(20, 2)
+  occupation               String?
+  marital_status           String?
+  education_level          String?
+  registration_date        DateTime? @db.Timestamp(6)
+  registration_branch_id   String?
+  customer_status          String?
+  last_updated             DateTime? @db.Timestamp(6)
+  accepts_marketing        Boolean?
+
+  @@index([email])
+  @@index([document_number])
+  @@map("customers")
+}
+
+model Product {
+  product_id            String    @id
+  customer_id           String
+  product_type          String
+  product_number        String?
+  currency              String
+  current_balance       Decimal?  @db.Decimal(20, 2)
+  credit_limit          Decimal?  @db.Decimal(20, 2)
+  interest_rate         Float?
+  opening_date          DateTime? @db.Date
+  expiration_date       DateTime? @db.Date
+  opening_branch_id     String?
+  product_status        String?
+  opening_channel       String?
+  has_linked_app        Boolean?
+  days_past_due         Float?
+  last_transaction_date DateTime? @db.Timestamp(6)
+  last_updated          DateTime? @db.Timestamp(6)
+
+  @@index([customer_id])
+  @@map("products")
+}
+
+model DailyExchangeRate {
+  date            DateTime @db.Date
+  source_currency String
+  target_currency String
+  exchange_rate   Decimal  @db.Decimal(24, 10)
+  buy_rate        Decimal? @db.Decimal(24, 10)
+  sell_rate       Decimal? @db.Decimal(24, 10)
+  source          String?
+
+  @@id([source_currency, target_currency, date])
+  @@map("daily_exchange_rates")
+}
+
+model Transaction {
+  transaction_id       String    @id
+  transaction_date     DateTime  @db.Timestamp(6)
+  process_date         DateTime? @db.Date
+  product_id           String?
+  customer_id          String?
+  transaction_type     String?
+  transaction_category String?
+  amount               Decimal   @db.Decimal(20, 2)
+  currency             String
+  amount_usd           Decimal?  @db.Decimal(20, 2)
+  channel              String?
+  branch_id            String?
+  merchant_name        String?
+  merchant_category    String?
+  transaction_country  String?
+  transaction_city     String?
+  transaction_status   String?
+  response_code        String?
+  is_fraud             Boolean?
+  fraud_score          Float?
+  latitude             Float?
+  longitude            Float?
+  // Colunas das operações simuladas pela API
+  origin               String    @default("historical")
+  payment_method       String?
+  description          String?
+  counterparty         Json?
+  related_product_id   String?
+  scheduled_payment_id String?
+  balance_after        Decimal?  @db.Decimal(20, 2)
+
+  @@index([customer_id, transaction_date(sort: Desc)])
+  @@index([product_id, transaction_date(sort: Desc)])
+  @@index([scheduled_payment_id])
+  @@map("transactions")
+}
+
+model ScheduledPayment {
+  scheduled_payment_id String    @id
+  customer_id          String
+  product_id           String
+  payment_method       String
+  amount               Decimal   @db.Decimal(20, 2)
+  currency             String
+  destination          Json
+  description          String?
+  frequency            String
+  next_run_at          DateTime? @db.Timestamptz(6)
+  end_date             DateTime? @db.Date
+  max_executions       Int?
+  executions_count     Int       @default(0)
+  status               String    @default("active")
+  last_run_at          DateTime? @db.Timestamptz(6)
+  last_transaction_id  String?
+  last_result          String?
+  created_at           DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime  @updatedAt @db.Timestamptz(6)
+
+  @@index([customer_id])
+  @@index([status, next_run_at])
+  @@map("scheduled_payments")
+}
+
+// Sessões de teste revogadas (logout). Só guarda o jti até o token expirar.
+model RevokedSession {
+  jti         String   @id
+  customer_id String
+  expires_at  DateTime @db.Timestamptz(6)
+  revoked_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([expires_at])
+  @@map("revoked_sessions")
+}
