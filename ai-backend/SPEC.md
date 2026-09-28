@@ -313,7 +313,7 @@ Rules and reason codes are exactly as in ARCHITECTURE §9. Rule order for `evalu
 
 | Node | Behaviour |
 |---|---|
-| `auth_guard` | `bank.get_session(token)`. A 401 → `respond` with `login_required`. **No LLM call.** |
+| `auth_guard` | `bank.get_session(token)`, then the conversation-ownership check. It runs in the API layer **before** the graph (`agent/service.py`), so a bad token or someone else's conversation ID never loads or writes a checkpoint. It is still recorded as the turn's first trace event. A 401 → `login_required`. **No LLM call.** |
 | `preprocess` | Language detection (`es`/`pt`/`other`), classifier route + confidence, and the repeat-contact check against the conversation store. `other` → reply in ES and PT that only those languages are supported. Mixed or unclear → keep the previous conversation language. |
 | `route` | `human` with confidence ≥ τ, or `REPEAT_CONTACT` → `handoff`. `out_of_scope` → refuse + redirect. Else → `agent`. |
 | `agent` | Call the chat model with the system prompt (versioned), history and tools. Final text → `respond`; tool calls → `policy_gate`. Refusal / error after retries → `handoff` with `LIMIT_REACHED` or a safe failure. |

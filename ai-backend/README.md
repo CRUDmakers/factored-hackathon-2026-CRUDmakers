@@ -2,7 +2,7 @@
 
 Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
 
-**Status:** M0 (skeleton, config, `/v1/health`, Node-shaped bank layer: fake + HTTP clients, fault injection, contract tests, fixture).
+**Status:** M1 (read path): `POST /v1/chat` answers from the bank with the P0 read tools, in Spanish or Portuguese, with a trace per turn. M0 (bank layer, fixture, contract tests) is below.
 
 ## Setup
 
@@ -21,6 +21,16 @@ BANK_MODE=http BANK_BASE_URL=http://localhost:3000 \
   .venv/bin/uvicorn ai_backend.api.app:app --reload                  # against Node
 curl localhost:8000/v1/health
 ```
+
+Chat (the token is a Node session token; in fake mode, tests and the eval issue them from the fake bank):
+
+```bash
+curl -s localhost:8000/v1/chat -H "Authorization: Bearer <token>" -H "Content-Type: application/json" \
+  -d '{"message": "Meu pagamento de ontem na Uber foi aprovado?"}'
+curl -s localhost:8000/v1/conversations/<conversation_id>/trace -H "Authorization: Bearer <token>"
+```
+
+The agent model comes from `AGENT_MODEL` in `.env` (see `.env.example`; development uses Gemini through a local 9router). `CLOCK_OVERRIDE` pins "today" for the fake bank and the agent, for reproducible runs.
 
 In http mode, the AI backend checks every session with Node (`GET /auth/sessions/current`) and forwards the customer's token. It never holds Node's JWT secret or service key.
 
@@ -48,6 +58,14 @@ In http mode, the AI backend checks every session with Node (`GET /auth/sessions
 ```bash
 .venv/bin/python -m pytest -q        # unit + integration + contract suite against the fake
 .venv/bin/ruff check .
+```
+
+### Live model tests
+
+`tests/live/` runs the M1 acceptance questions (ES and PT, answered from the real fixture) against the model configured in `.env`. They're excluded by default because they call the model:
+
+```bash
+.venv/bin/python -m pytest -m llm tests/live -s   # -s prints each answer, its tools, tokens and latency
 ```
 
 ### Contract tests against a live Node

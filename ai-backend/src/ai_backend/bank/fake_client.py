@@ -118,8 +118,9 @@ class FakeBankClient:
 
     # ---------- test identity provider (not part of BankClient) ----------
 
-    def issue_test_session(self, customer_id: str) -> Session:
-        """Like `POST /auth/test-sessions`: the eval and tests use it to log customers in."""
+    def issue_test_session(self, customer_id: str, ttl: timedelta = SESSION_TTL) -> Session:
+        """Like `POST /auth/test-sessions`: the eval and tests use it to log customers in.
+        A negative `ttl` gives an already-expired session (for tests)."""
         customer = self._fx.customers.get(customer_id)
         if customer is None:
             raise NotFound(f"Cliente {customer_id}")
@@ -130,7 +131,7 @@ class FakeBankClient:
         session = Session(
             customer_id=customer_id,
             session_id=f"SES-{n:06d}",
-            expires_at=self._clock() + SESSION_TTL,
+            expires_at=self._clock() + ttl,
             token=token,
         )
         self._sessions[token] = _FakeSession(session)

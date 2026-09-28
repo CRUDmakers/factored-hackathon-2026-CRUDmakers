@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import AwareDatetime, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,9 +28,15 @@ class Settings(BaseSettings):
     # Comma-separated origins allowed to call the API from a browser (the frontend).
     cors_origins: str = "http://localhost:5173"
 
+    # "sqlite:///<path>" for checkpoints, conversations and traces; "memory://" for tests.
     db_url: str = "sqlite:///./ai_backend.db"
     trace_retention_days: int = 30
     log_level: str = "INFO"
+
+    # Pins "now" (fake bank, agent's "today") for reproducible eval runs; real time if unset.
+    clock_override: AwareDatetime | None = None
+    # The dataset's last day; Node uses the real clock for everything new (ARCHITECTURE §8).
+    history_end: date = date(2026, 6, 17)
 
     models_config_path: Path = Path("config/models.yaml")
     policy_config_path: Path = Path("config/policy.yaml")

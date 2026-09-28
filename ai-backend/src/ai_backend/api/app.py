@@ -1,16 +1,37 @@
-"""FastAPI app. This module is the composition root: it loads config and builds the bank client."""
+"""FastAPI app. This module is the composition root: it loads config and wires the bank, the model,
+the stores and the agent graph."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, Request, Response, status
+import httpx
+from fastapi import FastAPI, Header, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from langchain_core.language_models import BaseChatModel
+from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from ai_backend.api.schemas import Check, HealthResponse
-from ai_backend.bank.client import BankClient, BankError
+from ai_backend.agent import messages as text
+from ai_backend.agent.graph import build_graph
+from ai_backend.agent.service import ChatService, ConversationNotFound, LoginRequired
+from ai_backend.api.schemas import (
+    ChatRequest,
+    ChatResponse,
+    Check,
+    ErrorResponse,
+    HealthResponse,
+    LoginRequiredResponse,
+    TraceResponse,
+)
+from ai_backend.bank.client import BankClient, BankError, BankUnavailable
 from ai_backend.bank.fake_client import FakeBankClient
 from ai_backend.bank.http_client import HttpBankClient
 from ai_backend.config import (
@@ -20,7 +41,15 @@ from ai_backend.config import (
     load_model_registry,
     load_policy_config,
 )
+from ai_backend.conversations.store import (
+    ConversationStore,
+    MemoryConversationStore,
+    SqliteConversationStore,
+)
+from ai_backend.llm.registry import ModelNotConfigured, build_chat_model
+from ai_backend.observability.store import MemoryTraceStore, SqliteTraceStore, TraceStore
 from ai_backend.settings import Settings, get_settings
+from ai_backend.tools.registry import REGISTRY, tool_schemas
 
 
 @dataclass(frozen=True)
@@ -29,34 +58,92 @@ class AppState:
     models: ModelRegistry
     policy: PolicyConfig
     bank: BankClient
+    service: ChatService | None  # None when the agent model has no credentials
+    service_problem: str | None = None
 
 
-def build_state(settings: Settings) -> AppState:
-    """Load everything the app needs. Invalid config fails here, so the app never starts broken."""
+def make_clock(settings: Settings) -> Callable[[], datetime]:
+    pinned = settings.clock_override
+    return (lambda: pinned) if pinned else (lambda: datetime.now(UTC))
+
+
+async def build_state(
+    settings: Settings, stack: AsyncExitStack, llm: BaseChatModel | None = None
+) -> AppState:
+    """Load everything the app needs. Invalid config fails here, so the app never starts broken.
+
+    `llm` replaces the configured agent model (tests use a scripted one).
+    """
     models = load_model_registry(settings.models_config_path)
     policy = load_policy_config(settings.policy_config_path)
+    clock = make_clock(settings)
+
     bank: BankClient
     if settings.bank_mode == "fake":
-        bank = FakeBankClient.from_dir(settings.bank_fixture_dir)
+        bank = FakeBankClient.from_dir(settings.bank_fixture_dir, clock)
     else:
         if not settings.bank_base_url:
             raise ConfigError("BANK_BASE_URL is required when BANK_MODE=http")
-        bank = HttpBankClient(settings.bank_base_url, policy.timeouts_seconds.bank, policy.retries)
-    return AppState(settings=settings, models=models, policy=policy, bank=bank)
+        http = HttpBankClient(settings.bank_base_url, policy.timeouts_seconds.bank, policy.retries)
+        stack.push_async_callback(http.aclose)
+        bank = http
+
+    checkpointer, conversations, traces = await _storage(settings, stack)
+
+    spec = models.get(settings.agent_model)
+    problem = None
+    if llm is None:
+        http_client = httpx.AsyncClient(timeout=policy.timeouts_seconds.llm)
+        stack.push_async_callback(http_client.aclose)
+        try:
+            llm = build_chat_model(
+                spec, settings, policy.timeouts_seconds.llm, policy.retries.max, http_client
+            )
+        except ModelNotConfigured as exc:
+            problem = f"{settings.agent_model}: {exc}"
+
+    service = None
+    if llm is not None:
+        service = ChatService(
+            graph=build_graph(checkpointer),
+            bank=bank,
+            llm=llm.bind_tools(tool_schemas()),
+            model_key=settings.agent_model,
+            model_spec=spec,
+            tools=REGISTRY,
+            policy=policy,
+            conversations=conversations,
+            traces=traces,
+            clock=clock,
+            history_end=settings.history_end,
+        )
+    return AppState(settings, models, policy, bank, service, problem)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+async def _storage(
+    settings: Settings, stack: AsyncExitStack
+) -> tuple[BaseCheckpointSaver, ConversationStore, TraceStore]:
+    url = settings.db_url
+    if url == "memory://":
+        return InMemorySaver(), MemoryConversationStore(), MemoryTraceStore()
+    if url.startswith("sqlite:///"):
+        path = Path(url.removeprefix("sqlite:///"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        checkpointer = await stack.enter_async_context(AsyncSqliteSaver.from_conn_string(str(path)))
+        trace_store = SqliteTraceStore(path)
+        await trace_store.purge_older_than(settings.trace_retention_days)
+        return checkpointer, SqliteConversationStore(path), trace_store
+    raise ConfigError(f"unsupported DB_URL {url!r} (use sqlite:///<path> or memory://)")
+
+
+def create_app(settings: Settings | None = None, llm: BaseChatModel | None = None) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        state = build_state(settings)
-        app.state.ai = state
-        try:
+        async with AsyncExitStack() as stack:
+            app.state.ai = await build_state(settings, stack, llm)
             yield
-        finally:
-            if isinstance(state.bank, HttpBankClient):
-                await state.bank.aclose()
 
     app = FastAPI(title="Banco LATAM AI backend", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
@@ -78,7 +165,67 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
         return HealthResponse(status="ok" if ok else "degraded", checks=checks)
 
+    @app.post(
+        "/v1/chat",
+        response_model=ChatResponse,
+        responses={401: {"model": LoginRequiredResponse}, 404: {"model": ErrorResponse}},
+    )
+    async def chat(
+        body: ChatRequest, request: Request, authorization: str | None = Header(default=None)
+    ) -> Any:
+        state: AppState = request.app.state.ai
+        if state.service is None:
+            return _error(503, "model_unavailable", "The assistant model is not configured.")
+        try:
+            result = await state.service.turn(
+                _bearer(authorization), body.message, body.conversation_id
+            )
+        except LoginRequired:
+            return _login_required()
+        except ConversationNotFound:
+            return _error(404, "conversation_not_found", "No such conversation.")
+        except BankUnavailable:
+            return _error(503, "bank_unavailable", "The bank could not answer right now.")
+        if result.status == "login_required":
+            return _login_required()
+        return ChatResponse(**result.__dict__)
+
+    @app.get(
+        "/v1/conversations/{conversation_id}/trace",
+        response_model=TraceResponse,
+        responses={401: {"model": LoginRequiredResponse}, 404: {"model": ErrorResponse}},
+    )
+    async def trace(
+        conversation_id: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> Any:
+        state: AppState = request.app.state.ai
+        if state.service is None:
+            return _error(503, "model_unavailable", "The assistant model is not configured.")
+        try:
+            events = await state.service.trace(_bearer(authorization), conversation_id)
+        except LoginRequired:
+            return _login_required()
+        except ConversationNotFound:
+            return _error(404, "conversation_not_found", "No such conversation.")
+        return TraceResponse(conversation_id=conversation_id, events=events)
+
     return app
+
+
+def _bearer(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    scheme, _, token = authorization.partition(" ")
+    return token.strip() or None if scheme.lower() == "bearer" else None
+
+
+def _login_required() -> JSONResponse:
+    body = LoginRequiredResponse(message=text.LOGIN_REQUIRED)
+    return JSONResponse(status_code=401, content=body.model_dump())
+
+
+def _error(code: int, error: str, message: str) -> JSONResponse:
+    return JSONResponse(status_code=code, content={"error": error, "message": message})
 
 
 def _check_models(state: AppState) -> Check:

@@ -24,6 +24,7 @@ def _settings(**overrides) -> Settings:
         models_config_path=ROOT / "config" / "models.yaml",
         policy_config_path=ROOT / "config" / "policy.yaml",
         anthropic_api_key="test-key",
+        db_url="memory://",
     )
     base.update(overrides)
     return Settings(**base)
@@ -62,8 +63,15 @@ def test_http_mode_needs_a_base_url():
         pass
 
 
-def test_health_degraded_when_agent_model_unknown():
-    r = _get_health(_settings(agent_model="nope"))
+def test_unknown_agent_model_stops_startup():
+    with pytest.raises(ConfigError, match="not in models.yaml"), TestClient(
+        create_app(_settings(agent_model="nope"))
+    ):
+        pass
+
+
+def test_health_degraded_when_judge_model_unknown():
+    r = _get_health(_settings(judge_model="nope"))
     assert r.status_code == 503
     assert not r.json()["checks"]["models"]["ok"]
 
