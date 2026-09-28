@@ -81,6 +81,7 @@ _SUMMARIES = {
     ReasonCode.VERIFY_MISMATCH: "A payment's read-back did not match what the customer confirmed.",
     ReasonCode.LIMIT_REACHED: "The request needed more steps than the assistant may take.",
     ReasonCode.ASSISTANT_FAILURE: "The assistant's model failed or refused to answer.",
+    ReasonCode.BANK_UNAVAILABLE: "The bank's systems did not answer, even after retries.",
     ReasonCode.CROSS_CUSTOMER: "The bank refused a record as belonging to another customer.",
 }
 

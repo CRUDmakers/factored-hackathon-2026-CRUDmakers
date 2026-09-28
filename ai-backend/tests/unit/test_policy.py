@@ -228,3 +228,18 @@ def test_message_keys_and_priorities():
     assert PolicyDecision("deny", R.CARD_EXPIRED).message_key == "card_expired"
     assert ALLOW.message_key is None
     assert R.FRAUD_RISK in HIGH_PRIORITY and R.CUSTOMER_REQUEST not in HIGH_PRIORITY
+
+
+def test_bank_unavailable_after_retries_hands_off():
+    [d] = post_tool_checks([{"kind": "bank_unavailable", "tool": "get_balances"}], CONFIG)
+    assert (d.decision, d.reason_code, d.details) == (
+        "escalate", R.BANK_UNAVAILABLE, {"tool": "get_balances"}
+    )
+    assert post_tool_checks([{"kind": "something_else"}], CONFIG) == []
+
+
+def test_bank_failure_during_a_payment_step():
+    from ai_backend.policy.engine import bank_failure
+
+    d = bank_failure("preview_payment")
+    assert (d.decision, d.reason_code) == ("escalate", R.BANK_UNAVAILABLE)

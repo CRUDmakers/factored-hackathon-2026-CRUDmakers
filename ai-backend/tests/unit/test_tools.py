@@ -168,6 +168,7 @@ async def test_bank_outage_becomes_an_error_result(bank, session_a):
     ctx = d.ToolContext(bank=faulty, session=session_a, today=NOW.date())
     r = await run(ctx, "get_balances")
     assert not r.ok and r.error_code == "bank_unavailable"
+    assert r.policy_facts == [{"kind": "bank_unavailable", "tool": "get_balances"}]
 
 
 # ---------- convert_currency ----------

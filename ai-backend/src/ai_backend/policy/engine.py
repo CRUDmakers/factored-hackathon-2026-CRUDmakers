@@ -48,15 +48,21 @@ def check_preview(
 def post_tool_checks(
     policy_facts: list[dict[str, Any]], config: PolicyConfig
 ) -> list[PolicyDecision]:
-    """After reads: escalations the model didn't ask for (fraud flag, blocked product)."""
+    """After reads: escalations the model didn't ask for (fraud flag, blocked product, the
+    bank failing after retries)."""
     decisions: list[PolicyDecision] = []
     for fact in policy_facts:
-        if fact.get("kind") != "transaction":
-            continue
-        for decision in (rules.fraud_risk(fact, config), rules.product_blocked(fact)):
-            if decision is not None:
-                decisions.append(decision)
+        if fact.get("kind") == "transaction":
+            candidates = [rules.fraud_risk(fact, config), rules.product_blocked(fact)]
+        else:
+            candidates = [rules.bank_unavailable(fact)]
+        decisions += [d for d in candidates if d is not None]
     return decisions
+
+
+def bank_failure(step: str) -> PolicyDecision:
+    """Node failed after retries during a payment step."""
+    return PolicyDecision("escalate", ReasonCode.BANK_UNAVAILABLE, {"tool": step})
 
 
 def verify_readback(expected: dict[str, Any], actual: dict[str, Any]) -> PolicyDecision:

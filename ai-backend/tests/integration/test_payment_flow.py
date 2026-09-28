@@ -377,16 +377,23 @@ def test_handoffs_are_private_to_their_customer():
 # ---------- failures at each step ----------
 
 
-@pytest.mark.parametrize(
-    ("fault", "code"),
-    [("timeout", "bank_unavailable"), ("malformed", "bank_unavailable")],
-)
-def test_preview_failures_go_back_to_the_model(fault, code):
+@pytest.mark.parametrize("fault", ["timeout", "error_500", "malformed"])
+def test_bank_outage_during_the_preview_hands_off(fault):
     faults = [BankFault(method="preview_payment", fault=fault)]
-    script = [tool_call("transfer_money", PAY_CARD), answer("El banco no responde ahora.")]
-    with Flow(script, faults=faults) as f:
+    with Flow([tool_call("transfer_money", PAY_CARD)], faults=faults) as f:
         body = f.ask()
-        assert body["status"] == "answered" and _tool_error(f.llm)["code"] == code
+        assert body["status"] == "handed_off" and "HND-" in body["message"]
+        assert f.handoff(body).reason_codes == ["BANK_UNAVAILABLE"]
+
+
+@pytest.mark.parametrize("fault", ["timeout", "error_500"])
+def test_bank_outage_during_a_read_hands_off(fault):
+    faults = [BankFault(method="get_balances", fault=fault)]
+    with Flow([tool_call("get_balances")], faults=faults) as f:
+        body = f.ask("¿Cuánto dinero tengo en mis cuentas?")
+        assert body["status"] == "handed_off"
+        assert f.handoff(body).reason_codes == ["BANK_UNAVAILABLE"]
+        assert len(f.llm.calls) == 1  # no second model call to improvise an answer
 
 
 def test_unknown_source_product_goes_back_to_the_model():

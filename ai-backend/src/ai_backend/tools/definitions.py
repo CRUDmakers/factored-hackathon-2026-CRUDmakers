@@ -353,7 +353,9 @@ class ToolSpec:
         except BankRejected as exc:
             return ToolResult.error(exc.code, exc.message)
         except (BankUnavailable, BankContractError):
-            return ToolResult.error("bank_unavailable", "The bank could not answer right now.")
+            result = ToolResult.error("bank_unavailable", "The bank could not answer right now.")
+            result.policy_facts.append({"kind": "bank_unavailable", "tool": self.name})
+            return result
 
 
 P0_READ_TOOLS: tuple[ToolSpec, ...] = (

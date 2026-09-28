@@ -406,10 +406,17 @@ async def prepare_write(state: AgentState, runtime: Runtime[AgentContext]) -> di
             event["outcome"] = "login_required"
             return {**_answer_all([call], "session_expired"), **_login_required()}
         except (BankUnavailable, BankContractError):
-            event["outcome"] = "error:bank_unavailable"
-            return back_to_agent(
-                ToolResult.error("bank_unavailable", "The bank could not answer right now.")
-            )
+            decision = engine.bank_failure("preview_payment")
+            event.update(outcome="error:bank_unavailable", reason_code=_code(decision))
+            return {
+                **_answer_all([call], "handed_to_human"),
+                "policy_decisions": [
+                    {"tool": call["name"], "decision": "escalate", "reason_code": _code(decision)}
+                ],
+                "escalation": [_code(decision)],
+                "tool_steps": steps,
+                "next_step": "handoff",
+            }
 
         amount_usd = await _amount_usd(ctx, preview) if preview else None
         decision = engine.check_preview(

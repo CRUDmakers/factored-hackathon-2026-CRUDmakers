@@ -150,6 +150,13 @@ def product_blocked(fact: dict[str, Any]) -> PolicyDecision | None:
     return None
 
 
+def bank_unavailable(fact: dict[str, Any]) -> PolicyDecision | None:
+    # Node failed even after the client's retries: the customer shouldn't wait on the model.
+    if fact.get("kind") == "bank_unavailable":
+        return PolicyDecision("escalate", ReasonCode.BANK_UNAVAILABLE, {"tool": fact.get("tool")})
+    return None
+
+
 # ---------- read-back after a payment ----------
 
 
