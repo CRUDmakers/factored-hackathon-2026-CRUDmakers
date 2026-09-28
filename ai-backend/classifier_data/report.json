@@ -1,0 +1,987 @@
+{
+  "dataset": {
+    "rows": {
+      "train": 377,
+      "validation": 125,
+      "test": 125
+    },
+    "families": {
+      "train": 76,
+      "validation": 25,
+      "test": 25
+    },
+    "author": "model-drafted (claude-opus-5-5); see classifier_data/README.md"
+  },
+  "features": "both",
+  "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "C": 1.0,
+  "tau": 0.18,
+  "selection_validation": {
+    "embedding": {
+      "C": 1.0,
+      "tau": 0.16,
+      "macro_f1": 0.5591,
+      "recall_ok": true
+    },
+    "tfidf": {
+      "C": 1.0,
+      "tau": 0.23,
+      "macro_f1": 0.4605,
+      "recall_ok": true
+    },
+    "both": {
+      "C": 1.0,
+      "tau": 0.18,
+      "macro_f1": 0.5916,
+      "recall_ok": true
+    }
+  },
+  "tau_curve_validation": [
+    {
+      "tau": 0.05,
+      "human_recall": 1.0,
+      "false_positives": 83
+    },
+    {
+      "tau": 0.06,
+      "human_recall": 1.0,
+      "false_positives": 80
+    },
+    {
+      "tau": 0.07,
+      "human_recall": 1.0,
+      "false_positives": 73
+    },
+    {
+      "tau": 0.08,
+      "human_recall": 1.0,
+      "false_positives": 68
+    },
+    {
+      "tau": 0.09,
+      "human_recall": 1.0,
+      "false_positives": 59
+    },
+    {
+      "tau": 0.1,
+      "human_recall": 1.0,
+      "false_positives": 46
+    },
+    {
+      "tau": 0.11,
+      "human_recall": 1.0,
+      "false_positives": 42
+    },
+    {
+      "tau": 0.12,
+      "human_recall": 1.0,
+      "false_positives": 38
+    },
+    {
+      "tau": 0.13,
+      "human_recall": 1.0,
+      "false_positives": 33
+    },
+    {
+      "tau": 0.14,
+      "human_recall": 0.96,
+      "false_positives": 32
+    },
+    {
+      "tau": 0.15,
+      "human_recall": 0.96,
+      "false_positives": 32
+    },
+    {
+      "tau": 0.16,
+      "human_recall": 0.96,
+      "false_positives": 31
+    },
+    {
+      "tau": 0.17,
+      "human_recall": 0.96,
+      "false_positives": 30
+    },
+    {
+      "tau": 0.18,
+      "human_recall": 0.96,
+      "false_positives": 28
+    },
+    {
+      "tau": 0.19,
+      "human_recall": 0.88,
+      "false_positives": 26
+    },
+    {
+      "tau": 0.2,
+      "human_recall": 0.84,
+      "false_positives": 25
+    },
+    {
+      "tau": 0.21,
+      "human_recall": 0.84,
+      "false_positives": 23
+    },
+    {
+      "tau": 0.22,
+      "human_recall": 0.84,
+      "false_positives": 22
+    },
+    {
+      "tau": 0.23,
+      "human_recall": 0.84,
+      "false_positives": 20
+    },
+    {
+      "tau": 0.24,
+      "human_recall": 0.8,
+      "false_positives": 19
+    },
+    {
+      "tau": 0.25,
+      "human_recall": 0.8,
+      "false_positives": 17
+    },
+    {
+      "tau": 0.26,
+      "human_recall": 0.8,
+      "false_positives": 17
+    },
+    {
+      "tau": 0.27,
+      "human_recall": 0.8,
+      "false_positives": 16
+    },
+    {
+      "tau": 0.28,
+      "human_recall": 0.76,
+      "false_positives": 15
+    },
+    {
+      "tau": 0.29,
+      "human_recall": 0.76,
+      "false_positives": 12
+    },
+    {
+      "tau": 0.3,
+      "human_recall": 0.76,
+      "false_positives": 10
+    },
+    {
+      "tau": 0.31,
+      "human_recall": 0.76,
+      "false_positives": 9
+    },
+    {
+      "tau": 0.32,
+      "human_recall": 0.68,
+      "false_positives": 9
+    },
+    {
+      "tau": 0.33,
+      "human_recall": 0.64,
+      "false_positives": 6
+    },
+    {
+      "tau": 0.34,
+      "human_recall": 0.6,
+      "false_positives": 6
+    },
+    {
+      "tau": 0.35,
+      "human_recall": 0.6,
+      "false_positives": 6
+    },
+    {
+      "tau": 0.36,
+      "human_recall": 0.6,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.37,
+      "human_recall": 0.6,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.38,
+      "human_recall": 0.56,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.39,
+      "human_recall": 0.48,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.4,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.41,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.42,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.43,
+      "human_recall": 0.4,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.44,
+      "human_recall": 0.36,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.45,
+      "human_recall": 0.36,
+      "false_positives": 4
+    },
+    {
+      "tau": 0.46,
+      "human_recall": 0.32,
+      "false_positives": 4
+    },
+    {
+      "tau": 0.47,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.48,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.49,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.5,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.51,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.52,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.53,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.54,
+      "human_recall": 0.24,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.55,
+      "human_recall": 0.2,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.56,
+      "human_recall": 0.2,
+      "false_positives": 1
+    },
+    {
+      "tau": 0.57,
+      "human_recall": 0.16,
+      "false_positives": 1
+    },
+    {
+      "tau": 0.58,
+      "human_recall": 0.12,
+      "false_positives": 1
+    },
+    {
+      "tau": 0.59,
+      "human_recall": 0.12,
+      "false_positives": 1
+    },
+    {
+      "tau": 0.6,
+      "human_recall": 0.12,
+      "false_positives": 1
+    },
+    {
+      "tau": 0.61,
+      "human_recall": 0.12,
+      "false_positives": 1
+    },
+    {
+      "tau": 0.62,
+      "human_recall": 0.12,
+      "false_positives": 1
+    },
+    {
+      "tau": 0.63,
+      "human_recall": 0.12,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.64,
+      "human_recall": 0.12,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.65,
+      "human_recall": 0.08,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.66,
+      "human_recall": 0.08,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.67,
+      "human_recall": 0.08,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.68,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.69,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.7,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.71,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.72,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.73,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.74,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.75,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.76,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.77,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.78,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.79,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.8,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.81,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.82,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.83,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.84,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.85,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.86,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.87,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.88,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.89,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.9,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.91,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.92,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.93,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.94,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.95,
+      "human_recall": 0.0,
+      "false_positives": 0
+    }
+  ],
+  "thresholds": {
+    "human_confidence_tau": 0.18,
+    "human_direct_tau": 0.63,
+    "out_of_scope_min_confidence": 0.6
+  },
+  "triage_test": {
+    "direct_handoff": {
+      "count": 8,
+      "correct": 8,
+      "recall_of_human": "8/24"
+    },
+    "human_reached_direct_or_flagged": "24/24",
+    "non_human_flagged_to_agent": 25,
+    "refused": {
+      "count": 10,
+      "correct": 10
+    }
+  },
+  "validation": {
+    "n": 125,
+    "macro_f1": 0.5916,
+    "per_class": {
+      "answer": {
+        "precision": 0.9118,
+        "recall": 0.5741,
+        "f1-score": 0.7045,
+        "support": 54.0
+      },
+      "clarify": {
+        "precision": 0.8696,
+        "recall": 0.7692,
+        "f1-score": 0.8163,
+        "support": 26.0
+      },
+      "human": {
+        "precision": 0.4615,
+        "recall": 0.96,
+        "f1-score": 0.6234,
+        "support": 25.0
+      },
+      "out_of_scope": {
+        "precision": 0.25,
+        "recall": 0.2,
+        "f1-score": 0.2222,
+        "support": 20.0
+      }
+    },
+    "human_recall": {
+      "hit": 24,
+      "of": 25,
+      "value": 0.96
+    },
+    "human_false_positives": {
+      "count": 28,
+      "of_non_human": 100
+    },
+    "confusion_matrix": {
+      "labels": [
+        "answer",
+        "clarify",
+        "human",
+        "out_of_scope"
+      ],
+      "rows_true_cols_predicted": [
+        [
+          31,
+          3,
+          8,
+          12
+        ],
+        [
+          1,
+          20,
+          5,
+          0
+        ],
+        [
+          1,
+          0,
+          24,
+          0
+        ],
+        [
+          1,
+          0,
+          15,
+          4
+        ]
+      ]
+    },
+    "by_language": {
+      "es": {
+        "n": 62,
+        "macro_f1": 0.5267,
+        "human_recall": 0.9231
+      },
+      "pt": {
+        "n": 63,
+        "macro_f1": 0.6576,
+        "human_recall": 1.0
+      }
+    }
+  },
+  "test": {
+    "baseline": {
+      "n": 125,
+      "macro_f1": 0.7864,
+      "per_class": {
+        "answer": {
+          "precision": 0.6933,
+          "recall": 0.9455,
+          "f1-score": 0.8,
+          "support": 55.0
+        },
+        "clarify": {
+          "precision": 1.0,
+          "recall": 0.5769,
+          "f1-score": 0.7317,
+          "support": 26.0
+        },
+        "human": {
+          "precision": 1.0,
+          "recall": 0.75,
+          "f1-score": 0.8571,
+          "support": 24.0
+        },
+        "out_of_scope": {
+          "precision": 0.8235,
+          "recall": 0.7,
+          "f1-score": 0.7568,
+          "support": 20.0
+        }
+      },
+      "human_recall": {
+        "hit": 18,
+        "of": 24,
+        "value": 0.75
+      },
+      "human_false_positives": {
+        "count": 0,
+        "of_non_human": 101
+      },
+      "confusion_matrix": {
+        "labels": [
+          "answer",
+          "clarify",
+          "human",
+          "out_of_scope"
+        ],
+        "rows_true_cols_predicted": [
+          [
+            52,
+            0,
+            0,
+            3
+          ],
+          [
+            11,
+            15,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            18,
+            0
+          ],
+          [
+            6,
+            0,
+            0,
+            14
+          ]
+        ]
+      },
+      "by_language": {
+        "es": {
+          "n": 62,
+          "macro_f1": 0.7664,
+          "human_recall": 0.6667
+        },
+        "pt": {
+          "n": 63,
+          "macro_f1": 0.8051,
+          "human_recall": 0.8333
+        }
+      }
+    },
+    "model": {
+      "n": 125,
+      "macro_f1": 0.7166,
+      "per_class": {
+        "answer": {
+          "precision": 0.8444,
+          "recall": 0.6909,
+          "f1-score": 0.76,
+          "support": 55.0
+        },
+        "clarify": {
+          "precision": 0.85,
+          "recall": 0.6538,
+          "f1-score": 0.7391,
+          "support": 26.0
+        },
+        "human": {
+          "precision": 0.4898,
+          "recall": 1.0,
+          "f1-score": 0.6575,
+          "support": 24.0
+        },
+        "out_of_scope": {
+          "precision": 1.0,
+          "recall": 0.55,
+          "f1-score": 0.7097,
+          "support": 20.0
+        }
+      },
+      "human_recall": {
+        "hit": 24,
+        "of": 24,
+        "value": 1.0
+      },
+      "human_false_positives": {
+        "count": 25,
+        "of_non_human": 101
+      },
+      "confusion_matrix": {
+        "labels": [
+          "answer",
+          "clarify",
+          "human",
+          "out_of_scope"
+        ],
+        "rows_true_cols_predicted": [
+          [
+            38,
+            3,
+            14,
+            0
+          ],
+          [
+            3,
+            17,
+            6,
+            0
+          ],
+          [
+            0,
+            0,
+            24,
+            0
+          ],
+          [
+            4,
+            0,
+            5,
+            11
+          ]
+        ]
+      },
+      "by_language": {
+        "es": {
+          "n": 62,
+          "macro_f1": 0.7368,
+          "human_recall": 1.0
+        },
+        "pt": {
+          "n": 63,
+          "macro_f1": 0.6957,
+          "human_recall": 1.0
+        }
+      }
+    },
+    "intent": {
+      "accuracy": 0.688,
+      "macro_f1": 0.6109
+    }
+  },
+  "errors_test": [
+    {
+      "text": "quero ver meu saldo",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "clarify"
+    },
+    {
+      "text": "se acreditó el depósito que esperaba?",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "já caiu o depósito que eu estava esperando?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "¿Por qué no se hizo la transferencia que intenté hoy?",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "mi transferencia fue rechazada, cuál fue el motivo?",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Por que a transferência que tentei hoje não foi feita?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "minha transferência foi recusada, qual foi o motivo?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Muéstrame mis últimos movimientos",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "ver mis movimientos recientes",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "clarify"
+    },
+    {
+      "text": "Me mostra minhas últimas movimentações",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "ver meu extrato recente",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "clarify"
+    },
+    {
+      "text": "move 1000 da minha corrente final 4234 pra poupança",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Quiero enviar 100 dólares a Ana Pérez, cuenta 123456789 del Banco de Bogotá, en Colombia",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "transferir 2000 pesos a Juan Gómez en otro banco de Argentina, cuenta 0000003100010000000001",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Quero enviar 100 dólares para Ana Pérez, conta 123456789 do Banco de Bogotá, na Colômbia",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "transferir 2000 pesos para Juan Gómez em outro banco na Argentina, conta 0000003100010000000001",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "a transferência de hoje tá pendente, quando cai?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "la de ayer",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "answer"
+    },
+    {
+      "text": "No me llegó la plata",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "falta dinero",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "Não recebi o dinheiro",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "tá faltando dinheiro",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "Quiero cambiar dinero",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "cuánto es en la otra moneda?",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "answer"
+    },
+    {
+      "text": "Quero trocar dinheiro",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "quanto é na outra moeda?",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "answer"
+    },
+    {
+      "text": "cuánto rinde un plazo fijo?",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    },
+    {
+      "text": "quanto rende um CDB?",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    },
+    {
+      "text": "¿Quién ganó el partido ayer?",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "cuéntame un chiste",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "qué tiempo hace en Bogotá?",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    },
+    {
+      "text": "Quem ganhou o jogo ontem?",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "me conta uma piada",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "como está o tempo em São Paulo?",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    },
+    {
+      "text": "em quem eu voto na eleição?",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "human"
+    }
+  ]
+}
