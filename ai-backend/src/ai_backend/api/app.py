@@ -3,7 +3,7 @@ the stores and the agent graph."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -17,8 +17,10 @@ from fastapi.responses import JSONResponse
 from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+from ai_backend import storage
 from ai_backend.agent import messages as text
 from ai_backend.agent.graph import build_graph
 from ai_backend.agent.service import (
@@ -56,6 +58,7 @@ from ai_backend.handoff.store import HandoffStore, MemoryHandoffStore, SqliteHan
 from ai_backend.llm.registry import ModelNotConfigured, build_chat_model
 from ai_backend.observability.store import MemoryTraceStore, SqliteTraceStore, TraceStore
 from ai_backend.settings import Settings, get_settings
+from ai_backend.storage import ConversationLock, InProcessLock
 from ai_backend.tools.registry import REGISTRY, tool_schemas
 
 
@@ -67,6 +70,7 @@ class AppState:
     bank: BankClient
     service: ChatService | None  # None when the agent model has no credentials
     service_problem: str | None = None
+    storage_check: Callable[[], Awaitable[None]] | None = None
 
 
 def make_clock(settings: Settings) -> Callable[[], datetime]:
@@ -98,7 +102,7 @@ async def build_state(
         stack.push_async_callback(http.aclose)
         bank = http
 
-    checkpointer, conversations, traces, handoffs = await _storage(settings, stack)
+    stores = await _storage(settings, stack)
 
     spec = models.get(settings.agent_model)
     problem = None
@@ -115,36 +119,79 @@ async def build_state(
     service = None
     if llm is not None:
         service = ChatService(
-            graph=build_graph(checkpointer),
+            graph=build_graph(stores.checkpointer),
             bank=bank,
             llm=llm.bind_tools(tool_schemas()),
             model_key=settings.agent_model,
             model_spec=spec,
             tools=REGISTRY,
             policy=policy,
-            conversations=conversations,
-            traces=traces,
-            handoffs=handoffs,
+            conversations=stores.conversations,
+            traces=stores.traces,
+            handoffs=stores.handoffs,
+            locks=stores.lock,
             clock=clock,
             history_end=settings.history_end,
         )
-    return AppState(settings, models, policy, bank, service, problem)
+    return AppState(settings, models, policy, bank, service, problem, stores.check)
 
 
-async def _storage(
-    settings: Settings, stack: AsyncExitStack
-) -> tuple[BaseCheckpointSaver, ConversationStore, TraceStore, HandoffStore]:
+@dataclass(frozen=True)
+class Storage:
+    checkpointer: BaseCheckpointSaver
+    conversations: ConversationStore
+    traces: TraceStore
+    handoffs: HandoffStore
+    lock: ConversationLock
+    check: Callable[[], Awaitable[None]] | None = None
+
+
+async def _storage(settings: Settings, stack: AsyncExitStack) -> Storage:
     url = settings.db_url
     if url == "memory://":
-        return InMemorySaver(), MemoryConversationStore(), MemoryTraceStore(), MemoryHandoffStore()
+        return Storage(
+            InMemorySaver(),
+            MemoryConversationStore(),
+            MemoryTraceStore(),
+            MemoryHandoffStore(),
+            InProcessLock(),
+        )
     if url.startswith("sqlite:///"):
         path = Path(url.removeprefix("sqlite:///"))
         path.parent.mkdir(parents=True, exist_ok=True)
         checkpointer = await stack.enter_async_context(AsyncSqliteSaver.from_conn_string(str(path)))
         trace_store = SqliteTraceStore(path)
         await trace_store.purge_older_than(settings.trace_retention_days)
-        return checkpointer, SqliteConversationStore(path), trace_store, SqliteHandoffStore(path)
-    raise ConfigError(f"unsupported DB_URL {url!r} (use sqlite:///<path> or memory://)")
+        return Storage(
+            checkpointer,
+            SqliteConversationStore(path),
+            trace_store,
+            SqliteHandoffStore(path),
+            InProcessLock(),
+        )
+    if url.startswith(("postgresql://", "postgres://")):
+        await storage.ensure_database(url)
+        pool = await storage.open_pool(url)
+        stack.push_async_callback(pool.close)
+        saver = AsyncPostgresSaver(pool)  # type: ignore[arg-type]
+        await saver.setup()
+        conversations = storage.PostgresConversationStore(pool)
+        traces = storage.PostgresTraceStore(pool)
+        handoffs = storage.PostgresHandoffStore(pool)
+        for store in (conversations, traces, handoffs):
+            await store.setup()
+        await traces.purge_older_than(settings.trace_retention_days)
+        return Storage(
+            saver,
+            conversations,
+            traces,
+            handoffs,
+            storage.PostgresAdvisoryLock(pool),
+            check=lambda: storage.ping(pool),
+        )
+    raise ConfigError(
+        f"unsupported DB_URL {url!r} (use postgresql://…, sqlite:///<path> or memory://)"
+    )
 
 
 def create_app(
@@ -174,6 +221,7 @@ def create_app(
         checks = {
             "models": _check_models(state),
             "bank": await _check_bank(state),
+            "storage": await _check_storage(state),
         }
         ok = all(c.ok for c in checks.values())
         if not ok:
@@ -299,6 +347,17 @@ def _missing_credentials(s: Settings, provider: str) -> str | None:
         }
     missing = [name for name, value in needed.items() if not value]
     return ", ".join(missing) or None
+
+
+async def _check_storage(state: AppState) -> Check:
+    mode = state.settings.db_url.split(":", 1)[0]
+    if state.storage_check is None:
+        return Check(ok=True, detail=f"{mode}: local")
+    try:
+        await state.storage_check()
+    except Exception as exc:  # any driver error means the database can't be used
+        return Check(ok=False, detail=f"{mode}: {type(exc).__name__}")
+    return Check(ok=True, detail=f"{mode}: reachable")
 
 
 async def _check_bank(state: AppState) -> Check:

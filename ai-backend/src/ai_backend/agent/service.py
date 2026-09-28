@@ -7,11 +7,9 @@ conversation run one at a time, so a confirmation can't be executed twice by par
 
 from __future__ import annotations
 
-import asyncio
 import re
 import time
 import uuid
-from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -30,6 +28,7 @@ from ai_backend.handoff.models import Handoff
 from ai_backend.handoff.store import HandoffStore
 from ai_backend.observability.store import TraceStore
 from ai_backend.observability.tracing import TraceEvent, Tracer
+from ai_backend.storage import ConversationLock, InProcessLock
 from ai_backend.tools.definitions import ToolSpec
 
 CONVERSATION_ID = re.compile(r"^conv_[0-9a-f]{32}$")
@@ -76,7 +75,7 @@ class ChatService:
     handoffs: HandoffStore
     clock: Callable[[], datetime]
     history_end: date
-    _locks: dict[str, asyncio.Lock] = field(default_factory=lambda: defaultdict(asyncio.Lock))
+    locks: ConversationLock = field(default_factory=InProcessLock)
 
     async def authenticate(self, token: str | None) -> Session:
         if not token:
@@ -111,7 +110,7 @@ class ChatService:
         else:
             await self.owned_conversation(session, conversation_id)
 
-        async with self._locks[conversation_id]:
+        async with self.locks.hold(conversation_id):
             return await self._run(
                 session, conversation_id, message, confirmation, started_at, auth_ms
             )

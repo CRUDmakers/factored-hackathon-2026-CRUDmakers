@@ -20,6 +20,8 @@ dependencies = [
     "langgraph==1.2.12",
     "langgraph-checkpoint-sqlite==3.1.1",
     "aiosqlite==0.22.1",
+    "langgraph-checkpoint-postgres==3.1.2",
+    "psycopg[binary,pool]==3.3.6",
     "langchain-core==1.6.5",
     "langchain-openai==1.6.6",
     "langchain-anthropic==1.7.4",
@@ -52,6 +54,7 @@ asyncio_default_fixture_loop_scope = "function"
 markers = [
     "node: needs a live Node mock bank (BANK_BASE_URL, EVAL_SERVICE_KEY)",
     "llm: calls the configured agent model (needs its credentials in .env)",
+    "postgres: needs a Postgres server (TEST_POSTGRES_URL)",
 ]
 addopts = "-m 'not llm'"
 
