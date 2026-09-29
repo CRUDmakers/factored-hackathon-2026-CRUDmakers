@@ -111,6 +111,7 @@ It stores no bank data of its own. It reads and acts only through the Node mock-
 - Pin exact versions and verify APIs against current docs.
 - Anthropic models go through `langchain-anthropic` (official Anthropic SDK underneath), never through an OpenAI-compatible shim.
 - Check that prompt caching and effort settings are passed through correctly.
+- The confirmation pause is kept in the conversation state rather than with `interrupt` (SPEC §8.1), so checkpointing, not `interrupt`, is what the payment flow relies on.
 
 ### ADR-002: session validation through Node
 
@@ -151,10 +152,14 @@ START
 auth_guard: Node GET /auth/sessions/current ──(401)──► respond(login_required) ──► END
   │ ok
   ▼
+intake: a payment awaiting confirmation? approve ──► execute_write (below) · reject/expired ──► respond
+  │ nothing pending (or the customer moved on)
+  ▼
 preprocess: detect language (es/pt) · route classifier (answer | clarify | human | out_of_scope)
   │          · repeat-contact check (assistant conversation history)
-  ├── human (confidence ≥ τ) or repeat contact ───────────────► handoff ──► respond ──► END
-  ├── out_of_scope ─────────────► respond(refuse + where to go) ──► END
+  ├── P(human) ≥ direct threshold, or repeat contact ──────────► handoff ──► respond ──► END
+  ├── confident out_of_scope ───► respond(refuse + where to go) ──► END
+  ├── P(human) ≥ τ: flag "possibly needs a human" in the agent's prompt (the agent decides)
   └── answer / clarify
         │
         ▼
@@ -166,7 +171,7 @@ preprocess: detect language (es/pt) · route classifier (answer | clarify | huma
         │  ├── allow (read) ────────► run_read_tools ──► escalation_check ──► agent
         │  └── confirm (write) ─────► prepare_write (Node dry run) ──► policy_gate on the preview
         │                                ├── declined / invalid ──► (error result back to agent) or handoff
-        │                                └── ok ──► confirm ⏸ interrupt (customer sees Node's preview)
+        │                                └── ok ──► turn ends: awaiting confirmation (Node's preview)
         │                                             ├── rejected / expired ──► agent
         │                                             └── approved ──► execute_write ──► verify ──► escalation_check ──► agent
         │                                                                 └── timeout / 5xx ──► reconcile ──► verify, or handoff
@@ -177,7 +182,7 @@ preprocess: detect language (es/pt) · route classifier (answer | clarify | huma
 - **`prepare_write`** calls Node with `?dry_run=true`. Node reports the debit, the exchange rate, the balance afterwards, the recipient's name and any predicted decline. The policy engine decides on that preview, not on the model's arguments.
 - **`verify`** reads the transaction back (`GET /transactions/{id}`). It checks that the method, amount, currency and source product match what the customer confirmed. Only an `Approved` read-back is reported as done. A `Declined` read-back is reported truthfully, with its reason.
 - **`reconcile`** runs when the execute call times out or fails with a 5xx. It looks for the operation among the customer's recent simulated transactions, and never re-sends it (§12).
-- **`escalation_check`** runs the policy engine on the facts that just came back, such as a fraud flag, a blocked product or days overdue. It can send the turn to `handoff` even if the model didn't ask for it.
+- **`escalation_check`** runs the policy engine on the facts that just came back, such as a fraud flag, a blocked product or days overdue. It can send the turn to `handoff` even if the model didn't ask for it. A filtered search that returns at most 3 rows is checked like the transactions themselves (M5 found that one model answered from searches and never opened the flagged record).
 - **`clarify`** is a hint from the classifier. The LLM phrases the question. After 2 unanswered clarifications, the system offers a human.
 - Every node appends `TraceEvent`s (§13).
 
@@ -262,7 +267,7 @@ A pure function: `evaluate(tool_call, session, state, policy_view_facts) → Pol
 | `AUTH_EXPIRED` | Node answers 401 (`unauthorized`, `session_expired`, `session_revoked`) | deny → ask to log in again |
 | `TOOL_UNKNOWN` | Tool not in registry | deny |
 | `WRITE_NEEDS_CONFIRMATION` | Any write whose Node preview is approved | confirm |
-| `AMOUNT_OVER_LIMIT` | Write amount in USD (converted in code) > limit | escalate |
+| `AMOUNT_OVER_LIMIT` | Previewed amount in USD (converted in code) > limit, or no USD rate | escalate |
 | `INSUFFICIENT_FUNDS` | Preview declined with `51` | deny (explain, offer another source) |
 | `CARD_EXPIRED` | Preview declined with `54` | deny (explain) |
 | `INVALID_DESTINATION` | Preview declined with `14`, or Node 422 on the destination or barcode | deny (ask to correct; counts as a clarification) |
@@ -271,7 +276,13 @@ A pure function: `evaluate(tool_call, session, state, policy_view_facts) → Pol
 | `UNRECOGNIZED_CHARGE` | Customer says they don't recognise a charge | escalate |
 | `DELINQUENT` | `days_past_due > 0` and customer wants to negotiate or arrange the debt. A plain payment toward the debt is allowed | escalate |
 | `FOLLOW_UP_REQUIRED` | Customer wants follow-up on a `Pending` or `Reversed` transaction (there's no case system) | escalate |
-| `REPEAT_CONTACT` | ≥ 2 earlier conversations with the assistant with the same intent in 7 days | escalate |
+| `REPEAT_CONTACT` | ≥ 2 earlier conversations with the assistant in 7 days about the same problem intent (`follow_up`, `decline_reason`) | escalate |
+| `HUMAN_ROUTE` | The route classifier's P(human) is at or above its direct-handoff threshold (precision ≥ 0.90 on validation) | escalate |
+| `ONE_ACTION_AT_A_TIME` | A second write in the same model message | deny |
+| `INVALID_REQUEST` | Node 422 not about the destination (e.g. a credit card as a transfer source), or an unexpected decline code | deny (explain) |
+| `CUSTOMER_REQUEST` | Customer asks for a person (`handoff_to_human`) | escalate |
+| `ASSISTANT_FAILURE` | The model failed after retries, refused, or returned an unusable answer | escalate |
+| `BANK_UNAVAILABLE` | Node timed out, failed (5xx) or answered malformed data, after the client's retries | escalate (safe message) |
 | `OUTCOME_UNKNOWN` | A payment timed out and reconciliation can't find it | escalate, never retry |
 | `VERIFY_MISMATCH` | The read-back doesn't match the confirmed action | escalate |
 | `LIMIT_REACHED` | Max tool steps or clarifications | escalate |
@@ -336,7 +347,7 @@ The handoff is built by **code** from the state, not written freely by the model
 | Read retries | Max 2 with exponential backoff for reads, session checks and LLM calls |
 | Write retries | **None**, until Node supports idempotency keys (R2). After R2: at most 1 retry, with the same key |
 | Reconciliation | After a payment times out or fails with a 5xx, list the source product's simulated transactions since the confirmation, and match the method, amount and currency. Found → `verify`. Not found → `OUTCOME_UNKNOWN` handoff. The customer is told the result is unknown, not that it failed |
-| Tool failure | After retries, the tool returns an error result. The agent explains and offers a human; the handoff includes what is known |
+| Bank failure | After the client's read retries, a timeout, 5xx or malformed answer from Node ends the turn with a safe message and a handoff (`BANK_UNAVAILABLE`) that includes what is known. The model doesn't improvise around a missing answer. During a payment, see reconciliation |
 | LLM failure / refusal | Safe message + handoff |
 | Budgets | Max 6 tool steps per turn, 2 clarifications per conversation, `max_tokens` per call |
 | Confirmation | Pending actions expire after 5 minutes and execute at most once. The action is marked `executed` in state before Node is called |
@@ -376,24 +387,39 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
   - p50/p95 latency; cost per attempted case and per successful resolution.
   - Everything broken down by language and customer segment.
 - **Grading:** deterministic checks first (outcome, reason codes, tool calls, facts, forbidden actions, payments executed). The LLM judge is used only for response quality and is validated on ≥ 30 human-labelled cases.
-- **Learned component:** the route classifier, trained on team-labelled ES/PT utterances.
-  - Split by template family to prevent leakage.
+- **Learned component:** the route classifier (SPEC §10, `classifier_data/report.md`), trained on **model-drafted** ES/PT utterances (the dataset has none usable).
+  - Split by template family, frozen before tuning, to prevent leakage.
   - Baseline: keyword rules.
-  - Metrics: macro-F1 and **human-route recall**, which sets the threshold τ.
+  - Metrics: macro-F1 and **human-route recall**, which sets τ. On the test split the model reaches all 24 human-route cases (the baseline 18) at the cost of more flags; used as triage (direct handoff only at high precision, otherwise a flag to the agent), it made 8/8 correct direct handoffs and 10/10 correct refusals.
+- **Results (M5, `eval/reports/m5-test/report.md`):** 262 frozen test scenarios × 3 repeats per system, agent `gemini-3.8-flash` through the development router.
+
+  | | B0 | B1 | S |
+  |---|---|---|---|
+  | Safe automated resolution | 219/417 (52.5%) | 328/417 (78.7%) | **414/417 (99.3%)** |
+  | Missed handoffs | 114/192 | 119/192 | **4/192** |
+  | Unnecessary handoffs | 3/594 | 8/594 | **0/594** |
+  | Unsafe outcomes | 24/786 | 140/786 | **0/786** |
+
+  - B1's unsafe outcomes are 74 payments nobody asked for and 66 made before the customer confirmed: the same model and prompt without the policy engine.
+  - With `gpt-oss-120b` as the agent, S stays at 0 unsafe but misses 44/192 handoffs: blocked-source, over-limit and fraud-flagged escalations depend on the model calling the payment tool or `get_transaction`. That is a design gap to fix (escalation on read results too).
+  - The `claude-sonnet-4-6` run is not a valid measurement: the router adds a placeholder argument to tools with an empty schema, and the provider failed on 56 cases in one repeat.
+  - The judge (response quality) is not validated yet; latency and tokens include the router's overhead, and cost is not defined.
+- **Results after the fixes (M5 v2, `eval/reports/m5-test-v2/report.md`):** language detection by one-language words, escalation on narrow searches, `get_balances` tolerant of a placeholder argument, and prompt v4. S: 0/192 missed handoffs (v1: 4), still 0/786 unsafe; B1 with the same prompt still 141/786 unsafe. `claude-sonnet-4-6` becomes measurable (94.2% safe resolution, 0 unsafe) but still skips some escalations the prompt asks for, which argues for enforcing them in code. The fixes came from reading test failures, so v2 is not a held-out estimate.
 
 ---
 
 ## 15. Deployment & configuration
 
 - **Docker Compose:** an `ai-backend` service next to `db`, `api` and `frontend` in the root `docker-compose.yml`:
-  - Port 8000.
+  - Port 8000; the image runs as a non-root user and is healthy only when `/v1/health` is.
   - `BANK_MODE=http` and `BANK_BASE_URL=http://api:3000`.
-  - `DB_URL` pointing at the `ai_backend` database, which an init script creates.
+  - `DB_URL=postgresql://…/ai_backend`. The service creates that database on startup if it's missing (Postgres init scripts only run on a fresh volume, so teammates' existing volumes would never get it). One connection pool serves the LangGraph checkpointer and the stores; an advisory lock keeps one turn at a time per conversation across servers.
   - CORS open to the frontend origin.
-  - The frontend reaches the service from the browser, so it gets the AI backend's URL as a build argument.
+  - The model settings come from `ai-backend/.env` if present.
+  - The frontend reaches the service from the browser, so it gets the AI backend's URL as a build argument (see `CHAT_API.md`).
 - **Offline:** the same image runs with `BANK_MODE=fake` (fixture data) and SQLite for tests and eval.
 - **Config:** env vars for secrets and endpoints; `config/models.yaml` and `config/policy.yaml` for behaviour.
-- **Health:** `GET /v1/health` checks the configuration, Node's `/health` and the model registry.
+- **Health:** `GET /v1/health` checks the configuration, the model registry and its credentials, Node's `/health`, and the database.
 
 ---
 
@@ -413,7 +439,8 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
      - Judges can't reproduce it, and the deployed service can't reach a local router.
      - The router adds about 2.1k hidden prompt tokens to every call, which distorts latency, token and cost metrics and adds instructions we don't control.
      - A retired model answered with HTTP 200 and an error message as its content, so the LLM layer must treat a response without `usage` as a provider failure.
-   - Before M5, choose direct providers (for example Anthropic plus an open model on a hosted endpoint).
+   - M5 still ran through the router (no direct keys yet): the agent comparison is `gemini-3.8-flash` vs `gpt-oss-120b` (open-weight) vs `claude-sonnet-4-6`, judged by `gemini-3.1-pro-low`. Its token and latency numbers carry the router's overhead, and cost is not defined.
+   - Before the submission, choose direct providers (for example Anthropic plus `gpt-oss-120b` or another open model on a hosted endpoint) and rerun the test split with the same commands.
 4. **Owner of S3 → `./data`:** the download is manual today; Node's ETL loads from `./data`.
 5. **Submission deadline** (check the kickoff timeline).
 
@@ -426,7 +453,7 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
 | R3 | `merchant` (case-insensitive contains), `min_amount` and `max_amount` filters on `GET /transactions` | "My Uber payment" lookups | Filter in Python |
 | R4 | Include `customer_id` in transaction and product responses | Defence-in-depth ownership check | Rely on Node's URL scoping |
 | R5 | Agree when a status reason is given. `explainStatus` gives a decline reason for `Pending`/`Reversed` rows that have a non-`00` code | The codes don't match the data (§17), so "insufficient funds" on a pending transfer misleads | The AI backend cites a reason only for `Declined` |
-| R6 | Compose: create the `ai_backend` database in `backend/docker/initdb`, and add the `ai-backend` service | Deployment | The AI team can send the PR |
+| R6 | ~~Compose: create the `ai_backend` database in `backend/docker/initdb`, and add the `ai-backend` service~~ | Deployment | **Done on the AI side (M3):** the service is in `docker-compose.yml` and creates its own database, so Node's files are untouched |
 
 ---
 

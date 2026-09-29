@@ -31,3 +31,10 @@ def test_secrets_are_not_printed(monkeypatch):
     assert "super-secret" not in repr(s)
     assert s.anthropic_api_key is not None
     assert s.anthropic_api_key.get_secret_value() == "sk-ant-super-secret"
+
+
+def test_empty_classifier_path_disables_the_classifier(monkeypatch):
+    monkeypatch.setenv("CLASSIFIER_PATH", "")
+    assert Settings(_env_file=None).classifier_path is None
+    monkeypatch.setenv("CLASSIFIER_PATH", "models/x.joblib")
+    assert Settings(_env_file=None).classifier_path == Path("models/x.joblib")

@@ -3,7 +3,7 @@ the stores and the agent graph."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -17,11 +17,18 @@ from fastapi.responses import JSONResponse
 from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
+from ai_backend import storage
 from ai_backend.agent import messages as text
 from ai_backend.agent.graph import build_graph
-from ai_backend.agent.service import ChatService, ConversationNotFound, LoginRequired
+from ai_backend.agent.service import (
+    ChatService,
+    ConversationNotFound,
+    HandoffNotFound,
+    LoginRequired,
+)
 from ai_backend.api.schemas import (
     ChatRequest,
     ChatResponse,
@@ -46,9 +53,12 @@ from ai_backend.conversations.store import (
     MemoryConversationStore,
     SqliteConversationStore,
 )
+from ai_backend.handoff.models import Handoff
+from ai_backend.handoff.store import HandoffStore, MemoryHandoffStore, SqliteHandoffStore
 from ai_backend.llm.registry import ModelNotConfigured, build_chat_model
 from ai_backend.observability.store import MemoryTraceStore, SqliteTraceStore, TraceStore
 from ai_backend.settings import Settings, get_settings
+from ai_backend.storage import ConversationLock, InProcessLock
 from ai_backend.tools.registry import REGISTRY, tool_schemas
 
 
@@ -60,6 +70,8 @@ class AppState:
     bank: BankClient
     service: ChatService | None  # None when the agent model has no credentials
     service_problem: str | None = None
+    storage_check: Callable[[], Awaitable[None]] | None = None
+    classifier_status: tuple[bool, str] = (True, "disabled")
 
 
 def make_clock(settings: Settings) -> Callable[[], datetime]:
@@ -68,15 +80,19 @@ def make_clock(settings: Settings) -> Callable[[], datetime]:
 
 
 async def build_state(
-    settings: Settings, stack: AsyncExitStack, llm: BaseChatModel | None = None
+    settings: Settings,
+    stack: AsyncExitStack,
+    llm: BaseChatModel | None = None,
+    clock: Callable[[], datetime] | None = None,
+    classifier: Any | None = None,
 ) -> AppState:
     """Load everything the app needs. Invalid config fails here, so the app never starts broken.
 
-    `llm` replaces the configured agent model (tests use a scripted one).
+    `llm`, `clock` and `classifier` replace the configured ones (tests).
     """
     models = load_model_registry(settings.models_config_path)
     policy = load_policy_config(settings.policy_config_path)
-    clock = make_clock(settings)
+    clock = clock or make_clock(settings)
 
     bank: BankClient
     if settings.bank_mode == "fake":
@@ -88,7 +104,8 @@ async def build_state(
         stack.push_async_callback(http.aclose)
         bank = http
 
-    checkpointer, conversations, traces = await _storage(settings, stack)
+    stores = await _storage(settings, stack)
+    classifier, classifier_status = _load_classifier(settings, classifier)
 
     spec = models.get(settings.agent_model)
     problem = None
@@ -105,44 +122,115 @@ async def build_state(
     service = None
     if llm is not None:
         service = ChatService(
-            graph=build_graph(checkpointer),
+            graph=build_graph(stores.checkpointer),
             bank=bank,
             llm=llm.bind_tools(tool_schemas()),
             model_key=settings.agent_model,
             model_spec=spec,
             tools=REGISTRY,
             policy=policy,
-            conversations=conversations,
-            traces=traces,
+            conversations=stores.conversations,
+            traces=stores.traces,
+            handoffs=stores.handoffs,
+            locks=stores.lock,
+            classifier=classifier,
             clock=clock,
             history_end=settings.history_end,
         )
-    return AppState(settings, models, policy, bank, service, problem)
+    return AppState(
+        settings, models, policy, bank, service, problem, stores.check, classifier_status
+    )
 
 
-async def _storage(
-    settings: Settings, stack: AsyncExitStack
-) -> tuple[BaseCheckpointSaver, ConversationStore, TraceStore]:
+def _load_classifier(
+    settings: Settings, injected: Any | None
+) -> tuple[Any | None, tuple[bool, str]]:
+    if injected is not None:
+        return injected, (True, "loaded (injected)")
+    path = settings.classifier_path
+    if path is None:
+        return None, (True, "disabled: the agent routes alone")
+    if not path.exists():
+        return None, (False, f"not trained: run `python -m ai_backend.classifier.train` ({path})")
+    from ai_backend.classifier.predict import RouteClassifier
+
+    classifier = RouteClassifier.load(path)
+    return classifier, (
+        True,
+        f"loaded ({classifier.meta.get('features')}, trained {classifier.meta.get('trained_at')})",
+    )
+
+
+@dataclass(frozen=True)
+class Storage:
+    checkpointer: BaseCheckpointSaver
+    conversations: ConversationStore
+    traces: TraceStore
+    handoffs: HandoffStore
+    lock: ConversationLock
+    check: Callable[[], Awaitable[None]] | None = None
+
+
+async def _storage(settings: Settings, stack: AsyncExitStack) -> Storage:
     url = settings.db_url
     if url == "memory://":
-        return InMemorySaver(), MemoryConversationStore(), MemoryTraceStore()
+        return Storage(
+            InMemorySaver(),
+            MemoryConversationStore(),
+            MemoryTraceStore(),
+            MemoryHandoffStore(),
+            InProcessLock(),
+        )
     if url.startswith("sqlite:///"):
         path = Path(url.removeprefix("sqlite:///"))
         path.parent.mkdir(parents=True, exist_ok=True)
         checkpointer = await stack.enter_async_context(AsyncSqliteSaver.from_conn_string(str(path)))
         trace_store = SqliteTraceStore(path)
         await trace_store.purge_older_than(settings.trace_retention_days)
-        return checkpointer, SqliteConversationStore(path), trace_store
-    raise ConfigError(f"unsupported DB_URL {url!r} (use sqlite:///<path> or memory://)")
+        return Storage(
+            checkpointer,
+            SqliteConversationStore(path),
+            trace_store,
+            SqliteHandoffStore(path),
+            InProcessLock(),
+        )
+    if url.startswith(("postgresql://", "postgres://")):
+        await storage.ensure_database(url)
+        pool = await storage.open_pool(url)
+        stack.push_async_callback(pool.close)
+        saver = AsyncPostgresSaver(pool)  # type: ignore[arg-type]
+        await saver.setup()
+        conversations = storage.PostgresConversationStore(pool)
+        traces = storage.PostgresTraceStore(pool)
+        handoffs = storage.PostgresHandoffStore(pool)
+        for store in (conversations, traces, handoffs):
+            await store.setup()
+        await traces.purge_older_than(settings.trace_retention_days)
+        return Storage(
+            saver,
+            conversations,
+            traces,
+            handoffs,
+            storage.PostgresAdvisoryLock(pool),
+            check=lambda: storage.ping(pool),
+        )
+    raise ConfigError(
+        f"unsupported DB_URL {url!r} (use postgresql://…, sqlite:///<path> or memory://)"
+    )
 
 
-def create_app(settings: Settings | None = None, llm: BaseChatModel | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    llm: BaseChatModel | None = None,
+    clock: Callable[[], datetime] | None = None,
+    classifier: Any | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async with AsyncExitStack() as stack:
-            app.state.ai = await build_state(settings, stack, llm)
+            app.state.ai = await build_state(settings, stack, llm, clock, classifier)
             yield
 
     app = FastAPI(title="Banco LATAM AI backend", version="0.1.0", lifespan=lifespan)
@@ -159,6 +247,8 @@ def create_app(settings: Settings | None = None, llm: BaseChatModel | None = Non
         checks = {
             "models": _check_models(state),
             "bank": await _check_bank(state),
+            "storage": await _check_storage(state),
+            "classifier": Check(ok=state.classifier_status[0], detail=state.classifier_status[1]),
         }
         ok = all(c.ok for c in checks.values())
         if not ok:
@@ -176,9 +266,10 @@ def create_app(settings: Settings | None = None, llm: BaseChatModel | None = Non
         state: AppState = request.app.state.ai
         if state.service is None:
             return _error(503, "model_unavailable", "The assistant model is not configured.")
+        confirmation = body.confirmation.model_dump() if body.confirmation else None
         try:
             result = await state.service.turn(
-                _bearer(authorization), body.message, body.conversation_id
+                _bearer(authorization), body.message, body.conversation_id, confirmation
             )
         except LoginRequired:
             return _login_required()
@@ -188,7 +279,16 @@ def create_app(settings: Settings | None = None, llm: BaseChatModel | None = Non
             return _error(503, "bank_unavailable", "The bank could not answer right now.")
         if result.status == "login_required":
             return _login_required()
-        return ChatResponse(**result.__dict__)
+        return ChatResponse(
+            conversation_id=result.conversation_id,
+            turn_id=result.turn_id,
+            status=result.status,
+            message=result.message,
+            language=result.language,
+            pending_action=result.pending_action,
+            handoff={"handoff_id": result.handoff_id} if result.handoff_id else None,
+            trace_id=result.trace_id,
+        )
 
     @app.get(
         "/v1/conversations/{conversation_id}/trace",
@@ -208,6 +308,26 @@ def create_app(settings: Settings | None = None, llm: BaseChatModel | None = Non
         except ConversationNotFound:
             return _error(404, "conversation_not_found", "No such conversation.")
         return TraceResponse(conversation_id=conversation_id, events=events)
+
+    @app.get(
+        "/v1/handoffs/{handoff_id}",
+        response_model=Handoff,
+        responses={401: {"model": LoginRequiredResponse}, 404: {"model": ErrorResponse}},
+    )
+    async def get_handoff(
+        handoff_id: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> Any:
+        """The handoff record, for the human-agent panel (the customer's own, until agent roles
+        exist)."""
+        state: AppState = request.app.state.ai
+        if state.service is None:
+            return _error(503, "model_unavailable", "The assistant model is not configured.")
+        try:
+            return await state.service.handoff(_bearer(authorization), handoff_id)
+        except LoginRequired:
+            return _login_required()
+        except HandoffNotFound:
+            return _error(404, "handoff_not_found", "No such handoff.")
 
     return app
 
@@ -254,6 +374,17 @@ def _missing_credentials(s: Settings, provider: str) -> str | None:
         }
     missing = [name for name, value in needed.items() if not value]
     return ", ".join(missing) or None
+
+
+async def _check_storage(state: AppState) -> Check:
+    mode = state.settings.db_url.split(":", 1)[0]
+    if state.storage_check is None:
+        return Check(ok=True, detail=f"{mode}: local")
+    try:
+        await state.storage_check()
+    except Exception as exc:  # any driver error means the database can't be used
+        return Check(ok=False, detail=f"{mode}: {type(exc).__name__}")
+    return Check(ok=True, detail=f"{mode}: reachable")
 
 
 async def _check_bank(state: AppState) -> Check:

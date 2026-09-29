@@ -1,0 +1,50 @@
+{
+  "dev": {
+    "count": 79,
+    "sha256": "c386e23437c5bcb07974c6922163954fd567d5e7972e0d482435b5b4160578bc",
+    "by_category": {
+      "ambiguous": 4,
+      "attack": 13,
+      "failure": 4,
+      "human": 16,
+      "multilingual": 5,
+      "normal": 31,
+      "unsupported": 6
+    },
+    "by_language": {
+      "en": 2,
+      "es": 32,
+      "mixed": 3,
+      "pt": 42
+    }
+  },
+  "test": {
+    "count": 262,
+    "sha256": "b670db8098103bdcfad8efe7b66cd5e89d91c16b6939b13751ee0adaab2cbed5",
+    "by_category": {
+      "ambiguous": 22,
+      "attack": 36,
+      "failure": 21,
+      "human": 47,
+      "multilingual": 14,
+      "normal": 103,
+      "unsupported": 19
+    },
+    "by_language": {
+      "en": 5,
+      "es": 122,
+      "mixed": 9,
+      "pt": 126
+    }
+  },
+  "history": [
+    {
+      "replaced": {
+        "dev": "e11a5177cf9a6869906617ee7c9ba2e405e69370b96a27dd836f1d17178bd94f",
+        "test": "52b0383f4d3bf69db13d2f06ef37d6739f0c6b6ea99133ec0ab7cee21b1e5a01"
+      },
+      "on": "2026-09-29",
+      "reason": "v2: prompt v4 states decline reasons in plain words without the code; the 05 fact group also accepts any 'autoriz' (3 test and 1 dev scenario; customer messages unchanged)"
+    }
+  ]
+}

@@ -9,6 +9,10 @@ thresholds:
   repeat_contact_window_days: 7
   repeat_contact_count: 2
 routing:
-  human_confidence_tau: 0.80        # set from classifier validation (human-route recall >= 0.95)
+  # null = use the thresholds stored with the trained classifier (models/route_classifier.joblib,
+  # chosen on validation: see classifier_data/report.md). Set a value only to override it.
+  human_confidence_tau: null
+  human_direct_tau: null
+  out_of_scope_min_confidence: null
 timeouts_seconds: {bank: 3, llm: 30}
 retries: {max: 2, backoff_base_seconds: 0.5}

@@ -88,3 +88,16 @@ def test_cost_uses_prices_and_cache_rate():
 def test_unknown_price_is_none_not_zero():
     spec = ModelSpec(provider="openai_compatible", model="m")
     assert cost_usd(spec, 1000, 100) is None
+
+
+async def test_conversation_intents_for_repeat_contact(conversations):
+    now = datetime(2026, 6, 18, 12, tzinfo=UTC)
+    await conversations.record_intent("c1", "CLI-A", "follow_up", now)
+    await conversations.record_intent("c1", "CLI-A", "follow_up", now)  # once per conversation
+    await conversations.record_intent("c2", "CLI-A", "follow_up", now - timedelta(days=1))
+    await conversations.record_intent("c3", "CLI-B", "follow_up", now)
+    await conversations.record_intent("c4", "CLI-A", "follow_up", now - timedelta(days=9))
+    since = now - timedelta(days=7)
+    assert await conversations.count_recent("CLI-A", "follow_up", since, "c9") == 2
+    assert await conversations.count_recent("CLI-A", "follow_up", since, "c1") == 1
+    assert await conversations.count_recent("CLI-A", "balance", since, "c9") == 0

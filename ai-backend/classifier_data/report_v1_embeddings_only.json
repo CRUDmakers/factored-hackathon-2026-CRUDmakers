@@ -1,0 +1,986 @@
+{
+  "dataset": {
+    "rows": {
+      "train": 377,
+      "validation": 125,
+      "test": 125
+    },
+    "families": {
+      "train": 76,
+      "validation": 25,
+      "test": 25
+    },
+    "author": "model-drafted (claude-opus-5-5); see classifier_data/README.md"
+  },
+  "embedding_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+  "C": 1.0,
+  "validation_macro_f1_by_C": {
+    "0.1": 0.6597,
+    "0.3": 0.6617,
+    "1.0": 0.664,
+    "3.0": 0.6343,
+    "10.0": 0.5944,
+    "30.0": 0.5736
+  },
+  "tau": 0.16,
+  "tau_curve_validation": [
+    {
+      "tau": 0.05,
+      "human_recall": 1.0,
+      "false_positives": 82
+    },
+    {
+      "tau": 0.06,
+      "human_recall": 1.0,
+      "false_positives": 75
+    },
+    {
+      "tau": 0.07,
+      "human_recall": 1.0,
+      "false_positives": 67
+    },
+    {
+      "tau": 0.08,
+      "human_recall": 1.0,
+      "false_positives": 66
+    },
+    {
+      "tau": 0.09,
+      "human_recall": 1.0,
+      "false_positives": 60
+    },
+    {
+      "tau": 0.1,
+      "human_recall": 1.0,
+      "false_positives": 50
+    },
+    {
+      "tau": 0.11,
+      "human_recall": 1.0,
+      "false_positives": 43
+    },
+    {
+      "tau": 0.12,
+      "human_recall": 0.96,
+      "false_positives": 39
+    },
+    {
+      "tau": 0.13,
+      "human_recall": 0.96,
+      "false_positives": 36
+    },
+    {
+      "tau": 0.14,
+      "human_recall": 0.96,
+      "false_positives": 35
+    },
+    {
+      "tau": 0.15,
+      "human_recall": 0.96,
+      "false_positives": 31
+    },
+    {
+      "tau": 0.16,
+      "human_recall": 0.96,
+      "false_positives": 29
+    },
+    {
+      "tau": 0.17,
+      "human_recall": 0.88,
+      "false_positives": 27
+    },
+    {
+      "tau": 0.18,
+      "human_recall": 0.88,
+      "false_positives": 25
+    },
+    {
+      "tau": 0.19,
+      "human_recall": 0.88,
+      "false_positives": 25
+    },
+    {
+      "tau": 0.2,
+      "human_recall": 0.88,
+      "false_positives": 24
+    },
+    {
+      "tau": 0.21,
+      "human_recall": 0.84,
+      "false_positives": 23
+    },
+    {
+      "tau": 0.22,
+      "human_recall": 0.84,
+      "false_positives": 22
+    },
+    {
+      "tau": 0.23,
+      "human_recall": 0.84,
+      "false_positives": 18
+    },
+    {
+      "tau": 0.24,
+      "human_recall": 0.8,
+      "false_positives": 17
+    },
+    {
+      "tau": 0.25,
+      "human_recall": 0.8,
+      "false_positives": 16
+    },
+    {
+      "tau": 0.26,
+      "human_recall": 0.8,
+      "false_positives": 15
+    },
+    {
+      "tau": 0.27,
+      "human_recall": 0.76,
+      "false_positives": 15
+    },
+    {
+      "tau": 0.28,
+      "human_recall": 0.76,
+      "false_positives": 14
+    },
+    {
+      "tau": 0.29,
+      "human_recall": 0.76,
+      "false_positives": 12
+    },
+    {
+      "tau": 0.3,
+      "human_recall": 0.68,
+      "false_positives": 11
+    },
+    {
+      "tau": 0.31,
+      "human_recall": 0.68,
+      "false_positives": 11
+    },
+    {
+      "tau": 0.32,
+      "human_recall": 0.64,
+      "false_positives": 10
+    },
+    {
+      "tau": 0.33,
+      "human_recall": 0.64,
+      "false_positives": 9
+    },
+    {
+      "tau": 0.34,
+      "human_recall": 0.6,
+      "false_positives": 9
+    },
+    {
+      "tau": 0.35,
+      "human_recall": 0.6,
+      "false_positives": 7
+    },
+    {
+      "tau": 0.36,
+      "human_recall": 0.56,
+      "false_positives": 6
+    },
+    {
+      "tau": 0.37,
+      "human_recall": 0.56,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.38,
+      "human_recall": 0.48,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.39,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.4,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.41,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.42,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.43,
+      "human_recall": 0.44,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.44,
+      "human_recall": 0.4,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.45,
+      "human_recall": 0.4,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.46,
+      "human_recall": 0.36,
+      "false_positives": 5
+    },
+    {
+      "tau": 0.47,
+      "human_recall": 0.36,
+      "false_positives": 4
+    },
+    {
+      "tau": 0.48,
+      "human_recall": 0.32,
+      "false_positives": 4
+    },
+    {
+      "tau": 0.49,
+      "human_recall": 0.28,
+      "false_positives": 4
+    },
+    {
+      "tau": 0.5,
+      "human_recall": 0.24,
+      "false_positives": 4
+    },
+    {
+      "tau": 0.51,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.52,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.53,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.54,
+      "human_recall": 0.24,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.55,
+      "human_recall": 0.2,
+      "false_positives": 3
+    },
+    {
+      "tau": 0.56,
+      "human_recall": 0.2,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.57,
+      "human_recall": 0.2,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.58,
+      "human_recall": 0.2,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.59,
+      "human_recall": 0.2,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.6,
+      "human_recall": 0.2,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.61,
+      "human_recall": 0.16,
+      "false_positives": 2
+    },
+    {
+      "tau": 0.62,
+      "human_recall": 0.12,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.63,
+      "human_recall": 0.12,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.64,
+      "human_recall": 0.12,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.65,
+      "human_recall": 0.12,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.66,
+      "human_recall": 0.08,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.67,
+      "human_recall": 0.08,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.68,
+      "human_recall": 0.08,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.69,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.7,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.71,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.72,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.73,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.74,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.75,
+      "human_recall": 0.04,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.76,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.77,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.78,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.79,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.8,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.81,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.82,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.83,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.84,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.85,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.86,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.87,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.88,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.89,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.9,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.91,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.92,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.93,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.94,
+      "human_recall": 0.0,
+      "false_positives": 0
+    },
+    {
+      "tau": 0.95,
+      "human_recall": 0.0,
+      "false_positives": 0
+    }
+  ],
+  "validation": {
+    "n": 125,
+    "macro_f1": 0.5591,
+    "per_class": {
+      "answer": {
+        "precision": 0.9032,
+        "recall": 0.5185,
+        "f1-score": 0.6588,
+        "support": 54.0
+      },
+      "clarify": {
+        "precision": 0.8333,
+        "recall": 0.7692,
+        "f1-score": 0.8,
+        "support": 26.0
+      },
+      "human": {
+        "precision": 0.4528,
+        "recall": 0.96,
+        "f1-score": 0.6154,
+        "support": 25.0
+      },
+      "out_of_scope": {
+        "precision": 0.1765,
+        "recall": 0.15,
+        "f1-score": 0.1622,
+        "support": 20.0
+      }
+    },
+    "human_recall": {
+      "hit": 24,
+      "of": 25,
+      "value": 0.96
+    },
+    "human_false_positives": {
+      "count": 29,
+      "of_non_human": 100
+    },
+    "confusion_matrix": {
+      "labels": [
+        "answer",
+        "clarify",
+        "human",
+        "out_of_scope"
+      ],
+      "rows_true_cols_predicted": [
+        [
+          28,
+          4,
+          8,
+          14
+        ],
+        [
+          0,
+          20,
+          6,
+          0
+        ],
+        [
+          1,
+          0,
+          24,
+          0
+        ],
+        [
+          2,
+          0,
+          15,
+          3
+        ]
+      ]
+    },
+    "by_language": {
+      "es": {
+        "n": 62,
+        "macro_f1": 0.5432,
+        "human_recall": 0.9231
+      },
+      "pt": {
+        "n": 63,
+        "macro_f1": 0.5762,
+        "human_recall": 1.0
+      }
+    }
+  },
+  "test": {
+    "baseline": {
+      "n": 125,
+      "macro_f1": 0.7864,
+      "per_class": {
+        "answer": {
+          "precision": 0.6933,
+          "recall": 0.9455,
+          "f1-score": 0.8,
+          "support": 55.0
+        },
+        "clarify": {
+          "precision": 1.0,
+          "recall": 0.5769,
+          "f1-score": 0.7317,
+          "support": 26.0
+        },
+        "human": {
+          "precision": 1.0,
+          "recall": 0.75,
+          "f1-score": 0.8571,
+          "support": 24.0
+        },
+        "out_of_scope": {
+          "precision": 0.8235,
+          "recall": 0.7,
+          "f1-score": 0.7568,
+          "support": 20.0
+        }
+      },
+      "human_recall": {
+        "hit": 18,
+        "of": 24,
+        "value": 0.75
+      },
+      "human_false_positives": {
+        "count": 0,
+        "of_non_human": 101
+      },
+      "confusion_matrix": {
+        "labels": [
+          "answer",
+          "clarify",
+          "human",
+          "out_of_scope"
+        ],
+        "rows_true_cols_predicted": [
+          [
+            52,
+            0,
+            0,
+            3
+          ],
+          [
+            11,
+            15,
+            0,
+            0
+          ],
+          [
+            6,
+            0,
+            18,
+            0
+          ],
+          [
+            6,
+            0,
+            0,
+            14
+          ]
+        ]
+      },
+      "by_language": {
+        "es": {
+          "n": 62,
+          "macro_f1": 0.7664,
+          "human_recall": 0.6667
+        },
+        "pt": {
+          "n": 63,
+          "macro_f1": 0.8051,
+          "human_recall": 0.8333
+        }
+      }
+    },
+    "model": {
+      "n": 125,
+      "macro_f1": 0.6909,
+      "per_class": {
+        "answer": {
+          "precision": 0.85,
+          "recall": 0.6182,
+          "f1-score": 0.7158,
+          "support": 55.0
+        },
+        "clarify": {
+          "precision": 0.8824,
+          "recall": 0.5769,
+          "f1-score": 0.6977,
+          "support": 26.0
+        },
+        "human": {
+          "precision": 0.4286,
+          "recall": 1.0,
+          "f1-score": 0.6,
+          "support": 24.0
+        },
+        "out_of_scope": {
+          "precision": 1.0,
+          "recall": 0.6,
+          "f1-score": 0.75,
+          "support": 20.0
+        }
+      },
+      "human_recall": {
+        "hit": 24,
+        "of": 24,
+        "value": 1.0
+      },
+      "human_false_positives": {
+        "count": 32,
+        "of_non_human": 101
+      },
+      "confusion_matrix": {
+        "labels": [
+          "answer",
+          "clarify",
+          "human",
+          "out_of_scope"
+        ],
+        "rows_true_cols_predicted": [
+          [
+            34,
+            2,
+            19,
+            0
+          ],
+          [
+            2,
+            15,
+            9,
+            0
+          ],
+          [
+            0,
+            0,
+            24,
+            0
+          ],
+          [
+            4,
+            0,
+            4,
+            12
+          ]
+        ]
+      },
+      "by_language": {
+        "es": {
+          "n": 62,
+          "macro_f1": 0.6896,
+          "human_recall": 1.0
+        },
+        "pt": {
+          "n": 63,
+          "macro_f1": 0.6923,
+          "human_recall": 1.0
+        }
+      }
+    },
+    "intent": {
+      "accuracy": 0.664,
+      "macro_f1": 0.6361
+    }
+  },
+  "errors_test": [
+    {
+      "text": "quero ver meu saldo",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "clarify"
+    },
+    {
+      "text": "se acreditó el depósito que esperaba?",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "já caiu o depósito que eu estava esperando?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "¿Por qué no se hizo la transferencia que intenté hoy?",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "mi transferencia fue rechazada, cuál fue el motivo?",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Por que a transferência que tentei hoje não foi feita?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "minha transferência foi recusada, qual foi o motivo?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Muéstrame mis últimos movimientos",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "ver mis movimientos recientes",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Me mostra minhas últimas movimentações",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "ver meu extrato recente",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "clarify"
+    },
+    {
+      "text": "move 1000 da minha corrente final 4234 pra poupança",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Quiero enviar 100 dólares a Ana Pérez, cuenta 123456789 del Banco de Bogotá, en Colombia",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "transferir 2000 pesos a Juan Gómez en otro banco de Argentina, cuenta 0000003100010000000001",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Quero enviar 100 dólares para Ana Pérez, conta 123456789 do Banco de Bogotá, na Colômbia",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "transferir 2000 pesos para Juan Gómez em outro banco na Argentina, conta 0000003100010000000001",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "Paga la factura de internet de 30 dólares con mi tarjeta de crédito, código 84670000000300000481003510000000000000000003",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "pagar el servicio de agua con la tarjeta, 25 dólares, código 82690000000250000481003510000000000000000004",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "pagar a conta de água com o cartão, 25 dólares, código 82690000000250000481003510000000000000000004",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "la transferencia de hoy dice pendiente, cuándo pasa?",
+      "lang": "es",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "a transferência de hoje tá pendente, quando cai?",
+      "lang": "pt",
+      "true": "answer",
+      "predicted": "human"
+    },
+    {
+      "text": "preciso pagar um boleto",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "la de ayer",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "answer"
+    },
+    {
+      "text": "No me llegó la plata",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "falta dinero",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "Não recebi o dinheiro",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "tá faltando dinheiro",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "Quiero cambiar dinero",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "cuánto es en la otra moneda?",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "answer"
+    },
+    {
+      "text": "Quero trocar dinheiro",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "transferencia",
+      "lang": "es",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "transferência",
+      "lang": "pt",
+      "true": "clarify",
+      "predicted": "human"
+    },
+    {
+      "text": "cuánto rinde un plazo fijo?",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    },
+    {
+      "text": "quanto rende um CDB?",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    },
+    {
+      "text": "¿Quién ganó el partido ayer?",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "cuéntame un chiste",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "qué tiempo hace en Bogotá?",
+      "lang": "es",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    },
+    {
+      "text": "Quem ganhou o jogo ontem?",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "me conta uma piada",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "human"
+    },
+    {
+      "text": "como está o tempo em São Paulo?",
+      "lang": "pt",
+      "true": "out_of_scope",
+      "predicted": "answer"
+    }
+  ]
+}

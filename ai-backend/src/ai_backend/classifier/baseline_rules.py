@@ -1,0 +1,205 @@
+"""Keyword baseline for the route (SPEC §10): what a simple FAQ bot would do.
+
+Accent-insensitive keyword rules in ES and PT, checked in order: human, out of scope, too
+vague (clarify), otherwise answer. Written from the route definitions, not tuned on the test
+split.
+"""
+
+from __future__ import annotations
+
+import re
+import unicodedata
+
+HUMAN = (
+    "persona",
+    "humano",
+    "agente",
+    "atendente",
+    "operador",
+    "supervisor",
+    "alguien del banco",
+    "alguem do banco",
+    "queja",
+    "reclam",
+    "denunc",
+    "demand",
+    "process",
+    "fraude",
+    "golpe",
+    "estaf",
+    "robaron",
+    "roubaram",
+    "robando",
+    "roubando",
+    "clonaron",
+    "clonaram",
+    "no reconozco",
+    "nao reconheco",
+    "no hice",
+    "nao fiz",
+    "no fui yo",
+    "nao fui eu",
+    "cancelar mi",
+    "cancelar meu",
+    "cerrar mi cuenta",
+    "encerrar minha conta",
+    "negociar",
+    "refinanciar",
+    "acuerdo",
+    "acordo",
+    "parcelar",
+    "chargeback",
+    "contracargo",
+    "contestar",
+    "indebid",
+    "indevid",
+    "dos veces",
+    "duas vezes",
+    "perdi mi tarjeta",
+    "perdi meu cartao",
+    "bloquearon",
+    "bloquearam",
+    "suspendida",
+    "suspensa",
+    "fallecio",
+    "faleceu",
+    "engoliu",
+    "se quedo con mi tarjeta",
+    "pendiente hace",
+    "pendente ha",
+    "tres veces",
+    "tres vezes",
+)
+OUT_OF_SCOPE = (
+    "invertir",
+    "investir",
+    "inversion",
+    "investimento",
+    "acciones",
+    "acoes",
+    "fondo",
+    "fundo",
+    "cdb",
+    "plazo fijo",
+    "pedir un prestamo",
+    "pedir um emprestimo",
+    "me prestan",
+    "emprestam",
+    "subir el limite",
+    "aumentar o limite",
+    "mas cupo",
+    "mais limite",
+    "direccion",
+    "endereco",
+    "telefono",
+    "telefone",
+    "correo",
+    "e-mail",
+    "abrir una cuenta",
+    "abrir uma conta",
+    "seguro",
+    "contrasena",
+    "senha",
+    "app",
+    "aplicativo",
+    "codigo de verificacion",
+    "codigo de verificacao",
+    "bitcoin",
+    "cripto",
+    "chiste",
+    "piada",
+    "partido",
+    "jogo",
+    "receta",
+    "receita",
+    "ignora",
+    "ignore",
+    "instrucciones",
+    "instrucoes",
+    "prompt",
+    "configuracion",
+    "configuracao",
+    "finge",
+    "finja",
+    "a que hora abre",
+    "que horas abre",
+    "promocion",
+    "promoc",
+    "impuesto",
+    "imposto",
+    "presidente",
+    "elecciones",
+    "eleicao",
+    "puntaje",
+    "score",
+    "serasa",
+    "buro",
+    "bancolombia",
+    "nubank",
+    "itau",
+    "esposa",
+    "mi hijo",
+    "meu filho",
+    "otro cliente",
+    "outro cliente",
+    "cli-",
+)
+# Words that make a short message specific enough to act on.
+SPECIFIC = (
+    "saldo",
+    "debo",
+    "devo",
+    "limite",
+    "fatura",
+    "factura",
+    "tarjeta",
+    "cartao",
+    "cuenta",
+    "conta",
+    "prestamo",
+    "emprestimo",
+    "transferencia",
+    "pago",
+    "pagamento",
+    "compra",
+    "deposito",
+    "retiro",
+    "saque",
+    "dolar",
+    "peso",
+    "movimiento",
+    "movimentac",
+    "extrato",
+    "extracto",
+    "gaste",
+    "gastei",
+    "gasto",
+    "vence",
+    "validade",
+    "interes",
+    "juros",
+)
+
+
+def normalise(text: str) -> str:
+    plain = unicodedata.normalize("NFD", text.lower())
+    return "".join(c for c in plain if not unicodedata.combining(c))
+
+
+def contains(text: str, keywords: tuple[str, ...]) -> bool:
+    """Keywords are words or word stems: match them at the start of a word only, so that
+    "acciones" (stocks) doesn't match inside "transacciones"."""
+    return any(re.search(r"(?<!\w)" + re.escape(k), text) for k in keywords)
+
+
+def route(text: str) -> str:
+    t = normalise(text)
+    if contains(t, HUMAN):
+        return "human"
+    if contains(t, OUT_OF_SCOPE):
+        return "out_of_scope"
+    words = re.findall(r"\w+", t)
+    has_number = any(ch.isdigit() for ch in t)
+    if len(words) <= 4 and not has_number and not contains(t, SPECIFIC):
+        return "clarify"
+    return "answer"

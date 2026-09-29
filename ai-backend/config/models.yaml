@@ -36,7 +36,20 @@ models:
     params: {max_tokens: 4096, temperature: 0}
     price_per_mtok: null
     capabilities: [tools]
-  # Open model: provider and model name are open decision #4 (ARCHITECTURE §16).
+  # Model comparison (M5), through the same router, so the same caveats apply.
+  gpt-oss-120b:  # open-weight model
+    provider: openai_compatible
+    model: ag/gpt-oss-120b-medium
+    params: {max_tokens: 4096, temperature: 0}
+    price_per_mtok: null
+    capabilities: [tools]
+  claude-sonnet-4-6:
+    provider: openai_compatible
+    model: ag/claude-sonnet-4-6
+    params: {max_tokens: 4096, temperature: 0}
+    price_per_mtok: null
+    capabilities: [tools]
+  # Open model for the deployment: provider and model name are open decision #4 (ARCHITECTURE §16).
   # open-model-1:
   #   provider: openai_compatible
   #   model: "<name served by the endpoint>"

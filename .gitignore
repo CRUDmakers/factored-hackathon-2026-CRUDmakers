@@ -84,4 +84,15 @@ wandb/
 # ai-backend local artifacts
 ai-backend/*.db
 *.part
-*eval/
+# Extracted fixture data: synthetic but kept out of the public repo (rebuild it with
+# `python -m eval.fixtures.extract`, see ai-backend/README.md).
+ai-backend/eval/fixtures/data/
+# The embedding model's weights (downloaded by fastembed; ~240 MB). The trained classifier itself
+# (models/route_classifier.joblib, <1 MB) is committed: the deployed model is the reported one.
+ai-backend/models/fastembed/
+!ai-backend/models/route_classifier.joblib
+
+# Eval scenarios quote fixture records: generated locally, frozen by eval/scenarios.lock.json.
+ai-backend/eval/scenarios/
+# Raw eval runs (full conversations); the reports in eval/reports/ are committed.
+ai-backend/eval/runs/

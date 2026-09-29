@@ -28,6 +28,7 @@ def _settings(**overrides) -> Settings:
         policy_config_path=ROOT / "config" / "policy.yaml",
         anthropic_api_key="test-key",
         db_url="memory://",
+        classifier_path=None,  # classifier routing is tested with an injected stub
         clock_override=NOW,
     )
     base.update(overrides)
@@ -106,11 +107,15 @@ def test_pt_payment_status_is_answered_from_the_bank():
         # The trace shows the whole turn, with the tool call and token usage.
         events = h.trace(token, body["conversation_id"]).json()["events"]
         nodes = [e["node"] for e in events]
-        assert nodes == ["auth_guard", "preprocess", "agent", "tool", "agent", "respond"]
-        tool = events[3]
+        assert nodes == [
+            "auth_guard", "intake", "preprocess", "agent", "policy_gate", "tool",
+            "escalation_check", "agent", "respond",
+        ]
+        [tool] = [e for e in events if e["node"] == "tool"]
         assert tool["tool"] == "search_transactions" and tool["outcome"] == "ok"
         assert tool["args_redacted"]["merchant"] == "Uber"
-        assert events[2]["tokens_in"] == 100 and events[2]["prompt_version"] == "system_v1"
+        agent = next(e for e in events if e["node"] == "agent")
+        assert agent["tokens_in"] == 100 and agent["prompt_version"] == "system_v4"
         assert {e["trace_id"] for e in events} == {body["trace_id"]}
 
         # Verified facts are kept for the handoff (M2).
@@ -216,9 +221,10 @@ def test_answer_without_usage_is_a_provider_failure():
         token = h.login()
         body = h.chat(token, PT_QUESTION).json()
         assert "no longer available" not in body["message"]
-        assert "Desculpe" in body["message"]
+        assert body["status"] == "handed_off" and "atendente" in body["message"]
         events = h.trace(token, body["conversation_id"]).json()["events"]
-        assert "without usage" in events[2]["error"]
+        agent = next(e for e in events if e["node"] == "agent")
+        assert "without usage" in agent["error"]
 
 
 def test_provider_exception_is_a_safe_message():
@@ -227,7 +233,8 @@ def test_provider_exception_is_a_safe_message():
 
     with Harness(ScriptedChatModel(script=[boom])) as h:
         body = h.chat(h.login(), PT_QUESTION).json()
-        assert body["status"] == "answered" and "Desculpe" in body["message"]
+        assert body["status"] == "handed_off"
+        assert body["handoff"]["handoff_id"] in body["message"]
 
 
 def test_refusal_finish_reason_is_a_safe_message():
@@ -235,7 +242,7 @@ def test_refusal_finish_reason_is_a_safe_message():
     refused.response_metadata = {"finish_reason": "content_filter"}
     with Harness(ScriptedChatModel(script=[refused])) as h:
         body = h.chat(h.login(), PT_QUESTION).json()
-        assert "Desculpe" in body["message"]
+        assert body["status"] == "handed_off"
 
 
 def test_tool_step_limit_hands_over_and_keeps_history_valid():
@@ -244,7 +251,7 @@ def test_tool_step_limit_hands_over_and_keeps_history_valid():
     with Harness(llm) as h:
         token = h.login()
         body = h.chat(token, "¿Cuánto dinero tengo en mis cuentas?").json()
-        assert "agente" in body["message"]
+        assert body["status"] == "handed_off" and "agente" in body["message"]
         # The next turn still works: every tool call got an answer in the history.
         h.chat(token, "Gracias por la ayuda", body["conversation_id"])
         history = llm.calls[-1]
@@ -256,7 +263,7 @@ def test_tool_step_limit_hands_over_and_keeps_history_valid():
 def test_unknown_tool_and_bad_arguments_go_back_to_the_model():
     def check(messages):
         errors = [json.loads(m.content)["error"]["code"] for m in messages[-2:]]
-        assert errors == ["unknown_tool", "invalid_arguments"]
+        assert errors == ["TOOL_UNKNOWN", "invalid_arguments"]
         return answer("¿Qué transacción quieres revisar?")
 
     two_calls = AIMessage(
@@ -271,9 +278,9 @@ def test_unknown_tool_and_bad_arguments_go_back_to_the_model():
         token = h.login()
         body = h.chat(token, "¿Cuáles fueron mis últimas compras?").json()
         assert body["status"] == "answered"
-        tools = [e for e in h.trace(token, body["conversation_id"]).json()["events"]
-                 if e["node"] == "tool"]
-        assert tools[0]["reason_code"] == "TOOL_UNKNOWN"
+        events = h.trace(token, body["conversation_id"]).json()["events"]
+        gate = next(e for e in events if e["node"] == "policy_gate")
+        assert "delete_everything=deny:TOOL_UNKNOWN" in gate["outcome"]
 
 
 def test_no_model_configured_is_503():
@@ -308,7 +315,7 @@ def test_sqlite_storage_survives_a_restart(tmp_path):
 def test_forbidden_from_the_bank_is_a_security_event_not_data():
     from ai_backend.bank.client import Forbidden
 
-    llm = ScriptedChatModel(script=[tool_call("get_balances"), answer("No puedo acceder a eso.")])
+    llm = ScriptedChatModel(script=[tool_call("get_balances")])
     with Harness(llm) as h:
         token = h.login()
 
@@ -322,4 +329,10 @@ def test_forbidden_from_the_bank_is_a_security_event_not_data():
             if e["node"] == "tool"
         ]
         assert tool["reason_code"] == "CROSS_CUSTOMER"
-        assert json.loads(llm.calls[1][-1].content)["error"]["code"] == "forbidden"
+        # A 403 is never data for the model: the turn goes straight to a human, urgently.
+        assert body["status"] == "handed_off" and len(llm.calls) == 1
+        handoff = h.client.get(
+            f"/v1/handoffs/{body['handoff']['handoff_id']}",
+            headers={"Authorization": f"Bearer {token}"},
+        ).json()
+        assert handoff["reason_codes"] == ["CROSS_CUSTOMER"] and handoff["priority"] == "high"
