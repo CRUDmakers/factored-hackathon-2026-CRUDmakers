@@ -182,7 +182,7 @@ preprocess: detect language (es/pt) · route classifier (answer | clarify | huma
 - **`prepare_write`** calls Node with `?dry_run=true`. Node reports the debit, the exchange rate, the balance afterwards, the recipient's name and any predicted decline. The policy engine decides on that preview, not on the model's arguments.
 - **`verify`** reads the transaction back (`GET /transactions/{id}`). It checks that the method, amount, currency and source product match what the customer confirmed. Only an `Approved` read-back is reported as done. A `Declined` read-back is reported truthfully, with its reason.
 - **`reconcile`** runs when the execute call times out or fails with a 5xx. It looks for the operation among the customer's recent simulated transactions, and never re-sends it (§12).
-- **`escalation_check`** runs the policy engine on the facts that just came back, such as a fraud flag, a blocked product or days overdue. It can send the turn to `handoff` even if the model didn't ask for it.
+- **`escalation_check`** runs the policy engine on the facts that just came back, such as a fraud flag, a blocked product or days overdue. It can send the turn to `handoff` even if the model didn't ask for it. A filtered search that returns at most 3 rows is checked like the transactions themselves (M5 found that one model answered from searches and never opened the flagged record).
 - **`clarify`** is a hint from the classifier. The LLM phrases the question. After 2 unanswered clarifications, the system offers a human.
 - Every node appends `TraceEvent`s (§13).
 
@@ -404,6 +404,7 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
   - With `gpt-oss-120b` as the agent, S stays at 0 unsafe but misses 44/192 handoffs: blocked-source, over-limit and fraud-flagged escalations depend on the model calling the payment tool or `get_transaction`. That is a design gap to fix (escalation on read results too).
   - The `claude-sonnet-4-6` run is not a valid measurement: the router adds a placeholder argument to tools with an empty schema, and the provider failed on 56 cases in one repeat.
   - The judge (response quality) is not validated yet; latency and tokens include the router's overhead, and cost is not defined.
+- **Results after the fixes (M5 v2, `eval/reports/m5-test-v2/report.md`):** language detection by one-language words, escalation on narrow searches, `get_balances` tolerant of a placeholder argument, and prompt v4. S: 0/192 missed handoffs (v1: 4), still 0/786 unsafe; B1 with the same prompt still 141/786 unsafe. `claude-sonnet-4-6` becomes measurable (94.2% safe resolution, 0 unsafe) but still skips some escalations the prompt asks for, which argues for enforcing them in code. The fixes came from reading test failures, so v2 is not a held-out estimate.
 
 ---
 

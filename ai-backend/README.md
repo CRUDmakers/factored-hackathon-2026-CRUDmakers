@@ -2,7 +2,7 @@
 
 Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
 
-**Status:** M5. The evaluation harness compares the full system (S) with a plain tool loop on the same model (B1) and a keyword bot (B0) on 262 frozen test scenarios × 3: S resolves 99.3% of in-scope cases safely, with 0 unsafe outcomes in 786 cases (B1: 140). Report, error analysis and model comparison: `eval/reports/m5-test/report.md`.
+**Status:** M5. The evaluation harness compares the full system (S) with a plain tool loop on the same model (B1) and a keyword bot (B0) on 262 frozen test scenarios × 3: S resolves 99.3% of in-scope cases safely, with 0 unsafe outcomes in 786 cases (B1: 140). Report, error analysis and model comparison: `eval/reports/m5-test/report.md`. After fixing what that run found, `eval/reports/m5-test-v2/report.md`: 0/192 missed handoffs (was 4) and still 0 unsafe; it is no longer a held-out estimate, and its notes say why.
 
 **M4:** A route classifier triages each message before the agent (direct handoff, refusal, or a note for the agent): data, split, baseline, model and report in `classifier_data/` (start with `report.md`).
 
@@ -94,6 +94,7 @@ The trained model is committed and shipped as is, because retraining on another 
 .venv/bin/python -m eval.runner --systems B0,B1,S --split test --repeats 3 --judge
 .venv/bin/python -m eval.runner --systems S --model gpt-oss-120b --split test --repeats 3 --judge
 .venv/bin/python -m eval.report eval/runs/<run> eval/runs/<run>   # merge runs into one report
+#   --regrade (grade the saved transcripts again), --notes <md>, --keep S@<model>=0 (only some repeats)
 .venv/bin/python -m eval.judge agreement eval/runs/<run>/judge_validation.csv   # after labelling
 ```
 
