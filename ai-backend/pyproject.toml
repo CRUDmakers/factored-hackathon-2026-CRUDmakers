@@ -72,3 +72,8 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # A markdown template: its long lines are prose inside an f-string.
 "src/ai_backend/classifier/report.py" = ["E501"]
+# Scenario message templates and word lists: data tables of ES/PT sentences.
+"eval/build_scenarios.py" = ["E501"]
+# Report templates (markdown prose) and the judge's rubric.
+"eval/report.py" = ["E501"]
+"eval/judge.py" = ["E501"]

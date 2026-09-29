@@ -91,3 +91,8 @@ ai-backend/eval/fixtures/data/
 # (models/route_classifier.joblib, <1 MB) is committed: the deployed model is the reported one.
 ai-backend/models/fastembed/
 !ai-backend/models/route_classifier.joblib
+
+# Eval scenarios quote fixture records: generated locally, frozen by eval/scenarios.lock.json.
+ai-backend/eval/scenarios/
+# Raw eval runs (full conversations); the reports in eval/reports/ are committed.
+ai-backend/eval/runs/

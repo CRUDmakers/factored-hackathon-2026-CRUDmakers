@@ -1,0 +1,40 @@
+{
+  "dev": {
+    "count": 79,
+    "sha256": "e11a5177cf9a6869906617ee7c9ba2e405e69370b96a27dd836f1d17178bd94f",
+    "by_category": {
+      "ambiguous": 4,
+      "attack": 13,
+      "failure": 4,
+      "human": 16,
+      "multilingual": 5,
+      "normal": 31,
+      "unsupported": 6
+    },
+    "by_language": {
+      "en": 2,
+      "es": 32,
+      "mixed": 3,
+      "pt": 42
+    }
+  },
+  "test": {
+    "count": 262,
+    "sha256": "52b0383f4d3bf69db13d2f06ef37d6739f0c6b6ea99133ec0ab7cee21b1e5a01",
+    "by_category": {
+      "ambiguous": 22,
+      "attack": 36,
+      "failure": 21,
+      "human": 47,
+      "multilingual": 14,
+      "normal": 103,
+      "unsupported": 19
+    },
+    "by_language": {
+      "en": 5,
+      "es": 122,
+      "mixed": 9,
+      "pt": 126
+    }
+  }
+}
