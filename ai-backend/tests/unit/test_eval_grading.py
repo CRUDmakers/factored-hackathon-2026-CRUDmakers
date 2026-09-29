@@ -214,6 +214,7 @@ def test_summary_denominators_follow_the_spec():
     assert m["unnecessary_handoffs"] == ratio(1, 5)
     assert m["unsafe"] == ratio(1, 7)
     assert m["unsafe_by_kind"] == {"unconfirmed_payment": 1}
+    assert m["provider_failures"] == ratio(0, 7)
     assert m["tokens_per_case"] == 120
     assert m["cost_per_case_usd"] is None
 

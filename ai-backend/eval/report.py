@@ -26,6 +26,7 @@ HEADLINE = [
     ("unnecessary_handoffs", "Unnecessary handoffs (did, shouldn't)"),
     ("unsafe", "Unsafe outcomes"),
     ("passed", "All checks passed"),
+    ("provider_failures", "Provider failures (handed off as ASSISTANT_FAILURE)"),
 ]
 
 
@@ -128,6 +129,10 @@ def render(
             " Regraded from the saved transcripts with the current grader."
             if meta.get("regraded")
             else ""
+        )
+        + "".join(
+            f" Only repeat(s) {', '.join(map(str, reps))} of {name} are included."
+            for name, reps in (meta.get("kept_repeats") or {}).items()
         ),
         "",
         "**Systems.** **S** = the full system (policy engine, classifier triage, confirmation, verification, handoff). "
@@ -325,11 +330,16 @@ def _judge(rows: list[dict[str, Any]] | None) -> list[str]:
 
 
 def rebuild(
-    run_dirs: list[Path], out_dir: Path, regrade: bool = False, notes: Path | None = None
+    run_dirs: list[Path],
+    out_dir: Path,
+    regrade: bool = False,
+    notes: Path | None = None,
+    keep: dict[str, set[int]] | None = None,
 ) -> Path:
     """One report from saved runs (the same split), e.g. the baselines plus a run per model.
     With `regrade`, the saved transcripts are graded again with the current grader (no model
-    calls), e.g. after a grading fix."""
+    calls), e.g. after a grading fix. `keep` limits a system to some repeats (e.g. the only
+    repeat a provider served without failing); the report says so."""
     from eval.judge import load_judge
 
     metas = [json.loads((d / "meta.json").read_text()) for d in run_dirs]
@@ -348,6 +358,12 @@ def rebuild(
         }
     ) != len(raw):
         raise SystemExit("the same system appears in more than one run")
+    keep = keep or {}
+    raw = [
+        r
+        for r in raw
+        if r["result"]["system"] not in keep or r["result"]["repeat"] in keep[r["result"]["system"]]
+    ]
     if regrade:
         raw = _regrade(raw, metas[0]["split"])
     results = [CaseResult(**r["result"]) for r in raw]
@@ -360,6 +376,7 @@ def rebuild(
         "scenarios": metas[0]["scenarios"],
         "runs": [r for m in metas for r in m["runs"]],
         "regraded": regrade,
+        "kept_repeats": {k: sorted(v) for k, v in keep.items()},
         # Findings reviewed by hand (markdown), shown after the headline.
         "notes": notes.read_text(encoding="utf-8") if notes else None,
     }
@@ -390,7 +407,18 @@ if __name__ == "__main__":
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--regrade", action="store_true", help="grade the transcripts again")
     parser.add_argument("--notes", type=Path, default=None, help="hand-written findings (markdown)")
+    parser.add_argument(
+        "--keep",
+        action="append",
+        default=[],
+        metavar="SYSTEM=REPEATS",
+        help="only these repeats of a system, e.g. S@claude-sonnet-4-6=0 (repeatable)",
+    )
     args = parser.parse_args()
+    keep = {
+        name: {int(r) for r in reps.split(",")}
+        for name, reps in (k.split("=", 1) for k in args.keep)
+    }
     root = Path(__file__).resolve().parents[1]
     out = args.out or root / "eval" / "reports" / args.runs[-1].name
-    print(f"report: {rebuild(args.runs, out, args.regrade, args.notes)}")
+    print(f"report: {rebuild(args.runs, out, args.regrade, args.notes, keep)}")

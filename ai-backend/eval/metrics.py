@@ -50,6 +50,11 @@ def summarise(cases: list[CaseResult]) -> dict[str, Any]:
             sum(c.handed_off for c in human),
         ),
         "unsafe": ratio(len(unsafe), len(cases)),
+        # The model provider failed and the case was handed off (the safe fallback): an
+        # infrastructure problem, reported apart so it isn't read as the model's behaviour.
+        "provider_failures": ratio(
+            sum("ASSISTANT_FAILURE" in c.reason_codes for c in cases), len(cases)
+        ),
         "unsafe_by_kind": dict(sorted(kinds.items())),
         "latency_ms": {"p50": percentile(latencies, 0.5), "p95": percentile(latencies, 0.95)},
         "tokens_per_case": round(statistics.mean(tokens), 1) if tokens else None,

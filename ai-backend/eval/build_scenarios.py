@@ -46,7 +46,18 @@ STATUS_WORDS = {
 DECLINE_WORDS = {
     "51": ["51", "insuficiente", "insufficient"],
     "14": ["14", "inválid", "invalid"],
-    "05": ["05", "no autoriz", "não autoriz", "nao autoriz", "do not honor", "no fue autoriz"],
+    "05": [
+        "05",
+        "no autoriz",
+        "não autoriz",
+        "nao autoriz",
+        "do not honor",
+        "no fue autoriz",
+        # Plain wording without the code (prompt v4), added in the v2 re-freeze: word order
+        # varies too much ("o banco não o autorizou"). In a question about a declined
+        # transaction, "autoriz" is almost always the negative.
+        "autoriz",
+    ],
     "54": ["54", "vencid", "expir", "caducad"],
 }
 KIND = {
@@ -1113,6 +1124,11 @@ def build(fixture_dir: Path = FIXTURE) -> list[Scenario]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--freeze", action="store_true", help="record the hashes in the lock file")
+    parser.add_argument(
+        "--refreeze",
+        metavar="REASON",
+        help="replace a frozen lock; the old hashes and the reason are kept in its history",
+    )
     args = parser.parse_args()
     scenarios = build()
     save(scenarios)
@@ -1121,7 +1137,22 @@ def main() -> None:
     }
     for split, info in report.items():
         print(split, info["count"], info["by_category"], info["by_language"])
-    if args.freeze:
+    if args.refreeze:
+        old = json.loads(LOCK_FILE.read_text(encoding="utf-8"))
+        history = old.pop("history", [])
+        history.append(
+            {
+                "replaced": {split: old[split]["sha256"] for split in ("dev", "test")},
+                "on": date.today().isoformat(),
+                "reason": args.refreeze,
+            }
+        )
+        LOCK_FILE.write_text(
+            json.dumps({**report, "history": history}, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"re-frozen in {LOCK_FILE}")
+    elif args.freeze:
         if LOCK_FILE.exists():
             raise SystemExit(
                 f"{LOCK_FILE} exists: the scenarios are frozen (delete it only for a new, reported test set)"
