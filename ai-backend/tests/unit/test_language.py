@@ -31,3 +31,18 @@ def test_short_first_message_picks_es_or_pt():
 
 def test_a_clear_switch_is_followed():
     assert detect("¿Y cuánto debo en la tarjeta de crédito?", previous="pt") == "es"
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # The statistical detector alone reads these as Spanish.
+        ("Quero pagar um boleto", "pt"),
+        ("quero ver meu saldo", "pt"),
+        ("Qual é o meu score de crédito?", "pt"),
+        ("me cobraron dos veces la misma compra", "es"),
+        ("Quiero pagar una cuenta", "es"),
+    ],
+)
+def test_words_of_one_language_only_decide_between_es_and_pt(text, expected):
+    assert detect(text) == expected
