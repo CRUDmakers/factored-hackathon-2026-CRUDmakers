@@ -2,7 +2,9 @@
 
 Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
 
-**Status:** M4. A route classifier triages each message before the agent (direct handoff, refusal, or a note for the agent): data, split, baseline, model and report in `classifier_data/` (start with `report.md`).
+**Status:** M5. The evaluation harness compares the full system (S) with a plain tool loop on the same model (B1) and a keyword bot (B0) on 262 frozen test scenarios × 3: S resolves 99.3% of in-scope cases safely, with 0 unsafe outcomes in 786 cases (B1: 140). Report, error analysis and model comparison: `eval/reports/m5-test/report.md`.
+
+**M4:** A route classifier triages each message before the agent (direct handoff, refusal, or a note for the agent): data, split, baseline, model and report in `classifier_data/` (start with `report.md`).
 
 **M3:** Runs in Docker Compose next to Node, Postgres and the frontend (below). Chat API for the frontend: `CHAT_API.md`.
 

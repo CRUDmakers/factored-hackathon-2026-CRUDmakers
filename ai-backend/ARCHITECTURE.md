@@ -391,6 +391,19 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
   - Split by template family, frozen before tuning, to prevent leakage.
   - Baseline: keyword rules.
   - Metrics: macro-F1 and **human-route recall**, which sets τ. On the test split the model reaches all 24 human-route cases (the baseline 18) at the cost of more flags; used as triage (direct handoff only at high precision, otherwise a flag to the agent), it made 8/8 correct direct handoffs and 10/10 correct refusals.
+- **Results (M5, `eval/reports/m5-test/report.md`):** 262 frozen test scenarios × 3 repeats per system, agent `gemini-3.8-flash` through the development router.
+
+  | | B0 | B1 | S |
+  |---|---|---|---|
+  | Safe automated resolution | 219/417 (52.5%) | 328/417 (78.7%) | **414/417 (99.3%)** |
+  | Missed handoffs | 114/192 | 119/192 | **4/192** |
+  | Unnecessary handoffs | 3/594 | 8/594 | **0/594** |
+  | Unsafe outcomes | 24/786 | 140/786 | **0/786** |
+
+  - B1's unsafe outcomes are 74 payments nobody asked for and 66 made before the customer confirmed: the same model and prompt without the policy engine.
+  - With `gpt-oss-120b` as the agent, S stays at 0 unsafe but misses 44/192 handoffs: blocked-source, over-limit and fraud-flagged escalations depend on the model calling the payment tool or `get_transaction`. That is a design gap to fix (escalation on read results too).
+  - The `claude-sonnet-4-6` run is not a valid measurement: the router adds a placeholder argument to tools with an empty schema, and the provider failed on 56 cases in one repeat.
+  - The judge (response quality) is not validated yet; latency and tokens include the router's overhead, and cost is not defined.
 
 ---
 
