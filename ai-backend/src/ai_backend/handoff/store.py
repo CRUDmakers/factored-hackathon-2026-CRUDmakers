@@ -26,6 +26,9 @@ class MemoryHandoffStore:
     async def get(self, handoff_id: str) -> Handoff | None:
         return self._items.get(handoff_id)
 
+    def all(self) -> list[Handoff]:
+        return list(self._items.values())
+
 
 class SqliteHandoffStore:
     def __init__(self, path: Path) -> None:
