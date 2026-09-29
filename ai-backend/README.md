@@ -1,6 +1,6 @@
 # AI backend
 
-Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`).
+Python service for the Transaccional customer-service assistant. Design: `ARCHITECTURE.md`. Implementation contract: `SPEC.md` (v0.2, aligned with the Node mock bank in `../backend`). What customers can ask, with real example replies and the evaluation results: `ASSISTANT_GUIDE.md`.
 
 **Status:** M5. The evaluation harness compares the full system (S) with a plain tool loop on the same model (B1) and a keyword bot (B0) on 262 frozen test scenarios × 3: S resolves 99.3% of in-scope cases safely, with 0 unsafe outcomes in 786 cases (B1: 140). Report, error analysis and model comparison: `eval/reports/m5-test/report.md`. After fixing what that run found, `eval/reports/m5-test-v2/report.md`: 0/192 missed handoffs (was 4) and still 0 unsafe; it is no longer a held-out estimate, and its notes say why.
 
