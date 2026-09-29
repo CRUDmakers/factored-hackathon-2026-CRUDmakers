@@ -84,6 +84,19 @@ In http mode, the AI backend checks every session with Node (`GET /auth/sessions
 
 The trained model is committed and shipped as is, because retraining on another platform can pick different hyperparameters. The embedding weights (~240 MB) are downloaded on first use into `models/fastembed/`. Set `CLASSIFIER_PATH=` (empty) to run without the classifier.
 
+## Evaluation
+
+```bash
+.venv/bin/python -m eval.build_scenarios            # fixture → eval/scenarios/{dev,test}/*.yaml (gitignored)
+.venv/bin/python -m eval.runner --systems B0,B1,S --split dev              # debug on dev
+.venv/bin/python -m eval.runner --systems B0,B1,S --split test --repeats 3 --judge
+.venv/bin/python -m eval.runner --systems S --model gpt-oss-120b --split test --repeats 3 --judge
+.venv/bin/python -m eval.report eval/runs/<run> eval/runs/<run>   # merge runs into one report
+.venv/bin/python -m eval.judge agreement eval/runs/<run>/judge_validation.csv   # after labelling
+```
+
+The scenarios are generated from the fixture, so they are rebuilt locally rather than committed. `eval/scenarios.lock.json` pins the test split, and the runner refuses to run test if the rebuilt files differ. Reports go to `eval/reports/` (committed). Raw transcripts and the judge's labelling sheet go to `eval/runs/` (gitignored: whole conversations). The runs need the models in `.env`; the harness itself is tested offline with a scripted model (`tests/unit/test_eval_grading.py`, `tests/integration/test_eval_runner.py`).
+
 ## Test
 
 ```bash

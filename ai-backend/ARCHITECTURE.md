@@ -425,7 +425,8 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
      - Judges can't reproduce it, and the deployed service can't reach a local router.
      - The router adds about 2.1k hidden prompt tokens to every call, which distorts latency, token and cost metrics and adds instructions we don't control.
      - A retired model answered with HTTP 200 and an error message as its content, so the LLM layer must treat a response without `usage` as a provider failure.
-   - Before M5, choose direct providers (for example Anthropic plus an open model on a hosted endpoint).
+   - M5 still ran through the router (no direct keys yet): the agent comparison is `gemini-3.8-flash` vs `gpt-oss-120b` (open-weight) vs `claude-sonnet-4-6`, judged by `gemini-3.1-pro-low`. Its token and latency numbers carry the router's overhead, and cost is not defined.
+   - Before the submission, choose direct providers (for example Anthropic plus `gpt-oss-120b` or another open model on a hosted endpoint) and rerun the test split with the same commands.
 4. **Owner of S3 → `./data`:** the download is manual today; Node's ETL loads from `./data`.
 5. **Submission deadline** (check the kickoff timeline).
 
