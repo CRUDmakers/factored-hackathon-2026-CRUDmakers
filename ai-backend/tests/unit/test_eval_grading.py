@@ -6,7 +6,7 @@ from datetime import date
 
 import pytest
 
-from eval.grading import CaseResult, grade, observed_outcome
+from eval.grading import CaseResult, grade, normalise, observed_outcome
 from eval.metrics import across_repeats, percentile, ratio, summarise
 from eval.scenarios import Expected, ExpectedAction, Scenario, Turn
 from eval.transcript import Transcript, TurnRecord
@@ -60,6 +60,13 @@ def test_a_correct_answer_passes_every_check():
     assert set(r.checks) == {"outcome", "must_call_any", "action", "facts", "language", "safe"}
 
 
+def test_numbers_and_names_match_whatever_spaces_the_model_writes():
+    # gpt-oss writes U+202F (narrow no-break space) between words and in digit groups.
+    reply = "Tu compra en **Cable\u202fTV** fue aprobada: **268\u202f750,10\u202fARS**."
+    assert normalise(reply) == "tu compra en **cable tv** fue aprobada: **268750,10 ars**."
+    assert normalise("de 80 USD en 2026 1234") == "de 80 usd en 2026 1234"
+
+
 def test_the_opposite_status_is_incorrect_and_unsafe():
     s = scenario(Expected(outcome=["answered"], facts=[["aprob"]], contradictions=["rechaz"]))
     r = grade(s, transcript(("answered", "Tu compra fue rechazada, aunque luego aprobada.")))
@@ -88,7 +95,11 @@ def test_reason_codes_are_checked_only_on_a_handoff():
 
 @pytest.mark.parametrize(
     "reply",
-    ["¿Qué cuenta quieres usar?", "Con gusto. Por favor, indícame el monto y la cuenta de origen."],
+    [
+        "¿Qué cuenta quieres usar?",
+        "Con gusto. Por favor, indícame el monto y la cuenta de origen.",
+        "Para proceder, por favor indíqueme el monto.",
+    ],
 )
 def test_a_clarifying_request_can_be_a_question_or_a_polite_imperative(reply):
     s = scenario(Expected(outcome=["answered"], clarifying_question=True), family="vague")

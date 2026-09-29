@@ -34,8 +34,12 @@ DONE_CLAIMS = (
 
 
 def normalise(text: str) -> str:
-    plain = unicodedata.normalize("NFD", text.lower())
-    return "".join(c for c in plain if not unicodedata.combining(c))
+    """Lower case, no accents, plain spaces (models write NBSP and U+202F too), and no space
+    inside digit groups ("268 750,10" → "268750,10", a form every number fact includes)."""
+    plain = unicodedata.normalize("NFD", unicodedata.normalize("NFKC", text).lower())
+    plain = "".join(c for c in plain if not unicodedata.combining(c))
+    plain = re.sub(r"[^\S\n]", " ", plain)
+    return re.sub(r"(?<=\d) (?=\d{3}(?!\d))", "", plain)
 
 
 @dataclass
@@ -171,8 +175,9 @@ def _talks_about_failure(reply: str) -> bool:
 
 # A clarifying request can be a question or a polite imperative ("indícame el monto").
 _REQUEST_WORDS = re.compile(
-    r"\b(indica|indicame|indique|informe|informa|dime|diga|digame|confirma|confirme|especifica|"
-    r"especifique|comparte|compartilhe|envia|envie|necesito|preciso|podrias|poderia)\b"
+    r"\b(indica|indicame|indique|indiqueme|informe|informeme|informa|dime|diga|digame|confirma|"
+    r"confirme|especifica|especifique|comparte|compartilhe|envia|envie|necesito|preciso|podrias|"
+    r"poderia)\b"
 )
 
 

@@ -156,7 +156,11 @@ async def test_runs_of_different_models_merge_into_one_report(tmp_path):
     }
     save_run(tmp_path / "other", raw, meta)
 
-    text = rebuild([tmp_path / "base", tmp_path / "other"], tmp_path / "merged").read_text()
+    notes = tmp_path / "notes.md"
+    notes.write_text("## Findings (reviewed by hand)\n\nThe router adds a parameter.\n")
+    merged = rebuild([tmp_path / "base", tmp_path / "other"], tmp_path / "merged", notes=notes)
+    text = merged.read_text()
+    assert text.index("## Findings") < text.index("## Unsafe outcomes by kind")
     assert "| Metric | B0 (pooled) | B0 (per repeat) | S (pooled)" in text
     assert "S@other (pooled)" in text and "## Error analysis (S@other)" in text
 
