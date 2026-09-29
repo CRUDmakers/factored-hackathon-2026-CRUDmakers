@@ -44,6 +44,9 @@ DECLINE_REASONS = {
 }
 # How many rows search_transactions scans when it has to filter in Python (R3).
 SCAN_LIMIT = 200
+# A filtered search with at most this many rows is about specific transactions: the policy
+# engine checks them like get_transaction does (fraud flag, blocked product).
+NARROW_SEARCH = 3
 
 
 @dataclass(frozen=True)
@@ -84,7 +87,9 @@ class _Args(BaseModel):
 
 
 class GetBalancesArgs(_Args):
-    pass
+    # No parameters. Some gateways add a placeholder parameter to empty tool schemas and the
+    # model fills it in; with nothing to validate, ignoring it is safe (writes still forbid it).
+    model_config = ConfigDict(extra="ignore", frozen=True)
 
 
 async def get_balances(ctx: ToolContext, args: GetBalancesArgs) -> ToolResult:
@@ -196,7 +201,36 @@ async def search_transactions(ctx: ToolContext, args: SearchTransactionsArgs) ->
         for r in rows
     ]
     data = {"total_matching": total, "returned": len(rows), "transactions": rows}
-    return ToolResult(ok=True, data=data, facts=facts)
+    policy_facts = []
+    if _filtered(args) and 0 < len(items) <= NARROW_SEARCH:
+        policy_facts = [f for t in items if (f := await _transaction_facts(ctx, t.transaction_id))]
+    return ToolResult(ok=True, data=data, facts=facts, policy_facts=policy_facts)
+
+
+def _filtered(args: SearchTransactionsArgs) -> bool:
+    return any(
+        v is not None
+        for v in (
+            args.date_from,
+            args.date_to,
+            args.type,
+            args.status,
+            args.category,
+            args.channel,
+            args.merchant,
+            args.min_amount,
+            args.max_amount,
+        )
+    )
+
+
+async def _transaction_facts(ctx: ToolContext, transaction_id: str) -> dict[str, Any] | None:
+    """The policy view of one transaction, or None if it can't be read (the search stands)."""
+    try:
+        detail = await ctx.bank.get_transaction(ctx.session, transaction_id)
+    except (NotFound, BankUnavailable, BankContractError):
+        return None
+    return await _policy_facts(ctx, detail)
 
 
 def _local_match(t: Any, args: SearchTransactionsArgs) -> bool:
@@ -247,17 +281,19 @@ async def get_transaction(ctx: ToolContext, args: GetTransactionArgs) -> ToolRes
         ok=True,
         data=data,
         facts=[Fact(fact, "get_transaction", detail.transaction_id)],
-        policy_facts=[
-            {
-                "kind": "transaction",
-                "transaction_id": detail.transaction_id,
-                "flagged_as_fraud": detail.flagged_as_fraud,
-                "fraud_score": detail.fraud_score,
-                "product_id": detail.product_id,
-                "product_status": await _product_status(ctx, detail.product_id),
-            }
-        ],
+        policy_facts=[await _policy_facts(ctx, detail)],
     )
+
+
+async def _policy_facts(ctx: ToolContext, detail: TransactionDetailPolicyView) -> dict[str, Any]:
+    return {
+        "kind": "transaction",
+        "transaction_id": detail.transaction_id,
+        "flagged_as_fraud": detail.flagged_as_fraud,
+        "fraud_score": detail.fraud_score,
+        "product_id": detail.product_id,
+        "product_status": await _product_status(ctx, detail.product_id),
+    }
 
 
 async def _product_status(ctx: ToolContext, product_id: str | None) -> str | None:

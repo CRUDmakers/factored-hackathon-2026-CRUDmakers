@@ -348,11 +348,19 @@ def test_delinquent_customer_asking_to_renegotiate_hands_off():
         Handoff.model_validate_json(h.model_dump_json())
 
 
-def test_fraud_flagged_transaction_hands_off_urgently():
-    script = [
-        tool_call("search_transactions", {"merchant": "Cine"}),
-        tool_call("get_transaction", {"transaction_id": "TRX-A4"}, "c2"),
-    ]
+@pytest.mark.parametrize(
+    "script",
+    [
+        # A narrow search is checked like the transaction itself: no need to open it.
+        [tool_call("search_transactions", {"merchant": "Cine"})],
+        [
+            tool_call("search_transactions", {"limit": 5}),
+            tool_call("get_transaction", {"transaction_id": "TRX-A4"}, "c2"),
+        ],
+    ],
+    ids=["narrow-search", "get-transaction"],
+)
+def test_fraud_flagged_transaction_hands_off_urgently(script):
     with Flow(script) as f:
         body = f.ask("¿Qué es este cargo de Cine Premium en mi tarjeta?")
         assert body["status"] == "handed_off"
@@ -360,7 +368,8 @@ def test_fraud_flagged_transaction_hands_off_urgently():
         assert h.reason_codes == ["FRAUD_RISK"] and h.priority == "high"
         assert h.request_summary.generated_by == "system"
         assert "TRX-A4" in h.evidence.transaction_ids
-        assert len(f.llm.calls) == 2  # the model never saw the flagged record's reply
+        # The model never saw a reply about the flagged record: the last call was a tool call.
+        assert len(f.llm.calls) == len(script)
 
 
 def test_handoffs_are_private_to_their_customer():

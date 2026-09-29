@@ -70,7 +70,24 @@ async def test_get_balances_masks_numbers_and_records_facts(ctx):
     assert any("Tarjeta Crédito" in f.fact and "available 3799.50" in f.fact for f in r.facts)
 
 
+async def test_get_balances_ignores_a_placeholder_argument(ctx):
+    # A gateway added {"reason": …} to the empty schema; rejecting it broke every balance lookup.
+    r = await run(ctx, "get_balances", reason="El cliente quiere saber su saldo")
+    assert r.ok
+
+
 # ---------- search_transactions ----------
+
+
+async def test_a_narrow_search_is_checked_like_a_single_transaction(ctx):
+    # A question about one charge answered from a search must still reach the fraud check.
+    narrow = await run(ctx, "search_transactions", merchant="Cine")
+    assert [f["transaction_id"] for f in narrow.policy_facts] == ["TRX-A4"]
+    assert narrow.policy_facts[0]["flagged_as_fraud"] is True
+    assert "flagged_as_fraud" not in str(narrow.data)
+    # A plain listing, or a filter that matches many rows, is not about one charge.
+    assert (await run(ctx, "search_transactions", limit=3)).policy_facts == []
+    assert (await run(ctx, "search_transactions", date_from="2026-06-01")).policy_facts == []
 
 
 async def test_search_uses_node_filters(ctx):
