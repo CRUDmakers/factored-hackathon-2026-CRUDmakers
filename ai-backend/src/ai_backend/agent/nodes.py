@@ -50,7 +50,7 @@ from ai_backend.tools.payments import (
     to_payment_request,
 )
 
-PROMPT_VERSION = "system_v3"
+PROMPT_VERSION = "system_v4"
 ROUTING_NOTES = {
     "possible_human": (
         "\n## Routing note\nA triage model thinks this message may need a human agent (fraud, "
