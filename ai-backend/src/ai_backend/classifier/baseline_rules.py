@@ -186,14 +186,20 @@ def normalise(text: str) -> str:
     return "".join(c for c in plain if not unicodedata.combining(c))
 
 
+def contains(text: str, keywords: tuple[str, ...]) -> bool:
+    """Keywords are words or word stems: match them at the start of a word only, so that
+    "acciones" (stocks) doesn't match inside "transacciones"."""
+    return any(re.search(r"(?<!\w)" + re.escape(k), text) for k in keywords)
+
+
 def route(text: str) -> str:
     t = normalise(text)
-    if any(k in t for k in HUMAN):
+    if contains(t, HUMAN):
         return "human"
-    if any(k in t for k in OUT_OF_SCOPE):
+    if contains(t, OUT_OF_SCOPE):
         return "out_of_scope"
     words = re.findall(r"\w+", t)
     has_number = any(ch.isdigit() for ch in t)
-    if len(words) <= 4 and not has_number and not any(k in t for k in SPECIFIC):
+    if len(words) <= 4 and not has_number and not contains(t, SPECIFIC):
         return "clarify"
     return "answer"

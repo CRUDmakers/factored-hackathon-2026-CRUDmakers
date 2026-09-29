@@ -114,6 +114,7 @@ A flag costs nothing when it's wrong (the agent answers normally), so the recall
 {selection}
 
 - **History (honest account):** the first run used embeddings only and scored test macro-F1 0.691 against the baseline's 0.786, with human recall 1.00 but 32/101 unnecessary human routes (`report_v1_embeddings_only.json`). Adding character n-grams was prompted by reading that run's test errors, so this test split is no longer untouched by design decisions. The feature set, C and τ themselves were still chosen on validation only.
+- **Baseline fix (found by the M5 evaluation):** the keyword rules used to match a keyword anywhere in a word, so \"acciones\" (stocks, out of scope) fired inside \"transacciones\". They now match at the start of a word only. That raised the baseline's test macro-F1 from 0.786 to the figure above; the model was not retrained or changed.
 - **Baseline:** `baseline_rules.py`, accent-insensitive ES/PT keyword rules written from the route definitions.
 
 ## Test results

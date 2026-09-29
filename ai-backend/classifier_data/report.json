@@ -599,12 +599,12 @@
   "test": {
     "baseline": {
       "n": 125,
-      "macro_f1": 0.7864,
+      "macro_f1": 0.8099,
       "per_class": {
         "answer": {
-          "precision": 0.6933,
-          "recall": 0.9455,
-          "f1-score": 0.8,
+          "precision": 0.7051,
+          "recall": 1.0,
+          "f1-score": 0.8271,
           "support": 55.0
         },
         "clarify": {
@@ -620,9 +620,9 @@
           "support": 24.0
         },
         "out_of_scope": {
-          "precision": 0.8235,
+          "precision": 1.0,
           "recall": 0.7,
-          "f1-score": 0.7568,
+          "f1-score": 0.8235,
           "support": 20.0
         }
       },
@@ -644,10 +644,10 @@
         ],
         "rows_true_cols_predicted": [
           [
-            52,
+            55,
             0,
             0,
-            3
+            0
           ],
           [
             11,
@@ -672,12 +672,12 @@
       "by_language": {
         "es": {
           "n": 62,
-          "macro_f1": 0.7664,
+          "macro_f1": 0.7824,
           "human_recall": 0.6667
         },
         "pt": {
           "n": 63,
-          "macro_f1": 0.8051,
+          "macro_f1": 0.8358,
           "human_recall": 0.8333
         }
       }

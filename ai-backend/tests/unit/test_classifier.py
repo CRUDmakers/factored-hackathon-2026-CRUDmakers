@@ -141,6 +141,8 @@ def test_frozen_split_refuses_overwrite_and_changed_data(tmp_path: Path):
         ("Hola", "clarify"),
         ("¿Cuánto dinero tengo en mi cuenta?", "answer"),
         ("500 dólares", "answer"),  # a number makes it specific enough for the baseline
+        # "acciones" (stocks) must not match inside "transacciones" (found by the M5 eval)
+        ("Muéstrame mis últimas 3 transacciones", "answer"),
     ],
 )
 def test_baseline(text, route):
