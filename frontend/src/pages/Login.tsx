@@ -4,7 +4,7 @@ import { useI18n, type MessageKey } from '../i18n';
 import { TEST_CUSTOMERS } from '../testCustomers';
 import { ErrorBox, LangSwitch } from '../ui';
 
-export function Login({ notice, onLogin }: { notice: MessageKey | null; onLogin: (s: Session) => void }) {
+export function Login({ notice, onLogin }: { notice?: MessageKey | null; onLogin?: (s: Session) => void }) {
   const { t, lang } = useI18n();
   const [customerId, setCustomerId] = useState('');
   const [error, setError] = useState<unknown>(null);
@@ -19,7 +19,7 @@ export function Login({ notice, onLogin }: { notice: MessageKey | null; onLogin:
     setLoading(true);
     setError(null);
     try {
-      onLogin(await startSession(value));
+      onLogin?.(await startSession(value));
     } catch (err) {
       setError(err);
     } finally {

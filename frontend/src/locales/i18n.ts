@@ -5,8 +5,11 @@ import { initReactI18next } from "react-i18next";
 
 import ptAuth from "./pt/auth.json";
 import ptCommon from "./pt/common.json";
+import ptValidation from "./pt/validation.json";
+
 import esAuth from "./es/auth.json";
 import esCommon from "./es/common.json";
+import esValidation from "./es/validation.json";
 
 export const i18nLangs: { value: "pt" | "es"; flag: string }[] = [
     { value: "pt", flag: "🇧🇷" },
@@ -29,8 +32,8 @@ i18next
         defaultNS,
 
         resources: {
-            pt: { auth: ptAuth, common: ptCommon },
-            es: { auth: esAuth, common: esCommon },
+            pt: { auth: ptAuth, common: ptCommon, validation: ptValidation },
+            es: { auth: esAuth, common: esCommon, validation: esValidation },
         },
 
         detection: {

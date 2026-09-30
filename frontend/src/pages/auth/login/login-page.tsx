@@ -4,30 +4,32 @@ import AuthLayoutTitle from "@/layouts/auth/auth-layout-title";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
-import { useCallback, useId } from "react";
+import { useId } from "react";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Trans } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import bankingCsAiApi from "@/services/api/banking-cs-ai.api";
+import useSafeCallback from "@/hooks/useSafeCallback";
+import { useNavigate } from "react-router-dom";
 
-export default function SignInPage() {
-    const formSchema = z.object({ identity: z.string().nonempty(), password: z.string().nonempty() });
+export default function LoginPage() {
+    const { t: tValid } = useTranslation("validation");
+
+    const navigate = useNavigate();
+
+    const customerIdId = useId();
+
+    const formSchema = z.object({ customerId: z.string().nonempty(tValid("nonEmpty")) });
     type FormSchema = z.infer<typeof formSchema>;
-
-    const indentityId = useId();
-    const passwordId = useId();
 
     const form = useForm<FormSchema>({
         resolver: zodResolver(formSchema),
-        defaultValues: {
-            identity: "",
-            password: "",
-        },
+        defaultValues: { customerId: "" },
     });
 
-    const onSubmit = useCallback(async (data: FormSchema) => {
-        await bankingCsAiApi.auth.signIn({ identity: data.identity, password: data.password });
-        throw new Error("Not implemented yet");
+    const onSubmit = useSafeCallback(async (data: FormSchema) => {
+        await bankingCsAiApi.auth.login({ customerId: data.customerId });
+        navigate("/session/home");
     }, []);
 
     return (
@@ -41,43 +43,21 @@ export default function SignInPage() {
             <form id="form-rhf-demo" onSubmit={form.handleSubmit(onSubmit)}>
                 <FieldGroup>
                     <Controller
-                        name="identity"
+                        name="customerId"
                         control={form.control}
                         render={({ field, fieldState }) => (
                             <Field data-invalid={fieldState.invalid}>
-                                <FieldLabel htmlFor={indentityId}>
-                                    <Trans ns={"auth"} i18nKey={"signIn.identity"}>
-                                        Identity
+                                <FieldLabel htmlFor={customerIdId}>
+                                    <Trans ns={"auth"} i18nKey={"signIn.customerId"}>
+                                        Customer ID
                                     </Trans>
                                 </FieldLabel>
                                 <Input
                                     {...field}
-                                    id={indentityId}
+                                    id={customerIdId}
                                     aria-invalid={fieldState.invalid}
                                     placeholder="CLI-XXXXXXXXX"
                                     autoComplete="off"
-                                />
-                                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                            </Field>
-                        )}
-                    />
-
-                    <Controller
-                        name="password"
-                        control={form.control}
-                        render={({ field, fieldState }) => (
-                            <Field data-invalid={fieldState.invalid}>
-                                <FieldLabel htmlFor={passwordId}>
-                                    <Trans ns={"auth"} i18nKey={"signIn.password"}>
-                                        Password
-                                    </Trans>
-                                </FieldLabel>
-                                <Input
-                                    {...field}
-                                    id={passwordId}
-                                    aria-invalid={fieldState.invalid}
-                                    autoComplete="off"
-                                    placeholder="********"
                                 />
                                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                             </Field>
