@@ -4,7 +4,7 @@ import { useI18n } from '../i18n';
  * Espaço reservado para o chat do assistente (Backend 2, de IA, ainda não existe).
  * Não faz nenhuma chamada de rede: quando o Backend 2 existir, a conversa entra aqui.
  */
-export function Assistant({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+export function Assistant({ open, onToggle }: { open?: boolean; onToggle?: () => void }) {
   const { t } = useI18n();
   return (
     <>
