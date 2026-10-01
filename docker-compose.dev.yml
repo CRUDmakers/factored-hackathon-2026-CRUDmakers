@@ -1,5 +1,7 @@
 # Variante de desenvolvimento (frontend com hot reload). Mesmo .env da raiz.
 # docker compose -f docker-compose.dev.yml up -d --build
+# Nome fixo: os volumes (banking-cs-ai_pgdata) não mudam com o nome da pasta do clone.
+name: banking-cs-ai
 services:
   db:
     image: postgres:17-alpine

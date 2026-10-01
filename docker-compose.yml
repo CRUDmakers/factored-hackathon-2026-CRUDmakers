@@ -1,4 +1,6 @@
 # Tudo é configurado pelo .env da raiz (copie de .env.example). Depois: docker compose up -d --build
+# Nome fixo: os volumes (banking-cs-ai_pgdata) não mudam com o nome da pasta do clone.
+name: banking-cs-ai
 services:
   db:
     image: postgres:17-alpine
