@@ -37,9 +37,9 @@ models:
     price_per_mtok: null
     capabilities: [tools]
   # Router combo: the 9router picks the backing model and falls back when one is out of quota.
-  combo-medium:
+  combo-banking-cs-ai:
     provider: openai_compatible
-    model: combo-medium
+    model: combo-banking-cs-ai
     params: {max_tokens: 4096, temperature: 0}
     price_per_mtok: null
     capabilities: [tools]
