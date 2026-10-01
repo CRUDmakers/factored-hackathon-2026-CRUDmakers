@@ -61,21 +61,49 @@ services:
     profiles: ["test"]
 
   # Internet banking de demonstração (Vite + React servido por nginx): http://localhost:5173
-  # As variáveis VITE_* entram no bundle no build e são usadas pelo NAVEGADOR (por isso localhost:3000).
+  # No dev o Vite lê as VITE_* do ambiente do container (não de build args) e as usa no NAVEGADOR (por isso localhost).
   frontend:
     image: frontend:dev
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
-      args:
-        VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:3000}
-        VITE_SERVICE_KEY: ${FRONTEND_SERVICE_KEY:-${AUTH_SERVICE_KEY:-demo-service-key}}
+    environment:
+      VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:3000}
+      VITE_SERVICE_KEY: ${FRONTEND_SERVICE_KEY:-${AUTH_SERVICE_KEY:-demo-service-key}}
+      VITE_AI_URL: ${FRONTEND_AI_URL:-http://localhost:8000}
     ports:
       - "5173:5173"
     depends_on:
       - api
+      - ai-backend
     volumes:
       - ./frontend:/app
+
+  # Assistente de IA (Backend 2): http://localhost:8000/v1/health · contrato do chat em ai-backend/CHAT_API.md
+  # - Cria o próprio banco `ai_backend` neste Postgres ao subir (conversas, checkpoints, traces, handoffs).
+  # - Não guarda o segredo JWT nem a chave de serviço: valida cada sessão na API (GET /auth/sessions/current).
+  # - O modelo vem de ai-backend/.env (opcional; veja ai-backend/.env.example).
+  ai-backend:
+    build: ./ai-backend
+    env_file:
+      - path: ./ai-backend/.env
+        required: false
+    environment:
+      BANK_MODE: http
+      BANK_BASE_URL: http://api:3000
+      DB_URL: postgresql://banking:banking@db:5432/ai_backend
+      CORS_ORIGINS: ${AI_CORS_ORIGINS:-http://localhost:5173}
+      # Desenvolvimento: o 9router roda no host; de dentro do container ele é host.docker.internal.
+      OPENAI_COMPAT_BASE_URL: ${AI_OPENAI_COMPAT_BASE_URL:-http://host.docker.internal:20128/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
 
 volumes:
   pgdata:

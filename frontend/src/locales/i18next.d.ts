@@ -1,5 +1,5 @@
 import auth from "./pt/auth.json";
-import commom from "./pt/common.json";
+import common from "./pt/common.json";
 import validation from "./pt/validation.json";
 
 import { defaultNS } from "./i18n";

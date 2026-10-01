@@ -1,4 +1,157 @@
 {
     "enter": "Entrar",
-    "loading": "Cargando..."
+    "loading": "Carregando...",
+    "retry": "Tentar novamente",
+    "logout": "Sair",
+    "session": {
+        "expired": "Sua sessão expirou. Entre novamente.",
+        "invalid": "Sua sessão não é mais válida. Entre novamente."
+    },
+    "nav": {
+        "home": "Início",
+        "assistant": "Assistente",
+        "guide": "Guia do assistente",
+        "language": "Idioma"
+    },
+    "home": {
+        "hello": "Olá, {{name}}",
+        "helloAnon": "Olá",
+        "netWorth": "Patrimônio líquido",
+        "netWorthHint": "Soma de contas, investimentos e dívidas, convertida para dólares",
+        "available": "Disponível",
+        "debt": "Dívidas",
+        "transfer": "Transferir",
+        "askAssistant": "Falar com o assistente",
+        "quickTitle": "Peça ao assistente",
+        "quickSubtitle": "Um clique e ele responde com os dados da sua conta.",
+        "accounts": "Contas",
+        "cards": "Cartões de crédito",
+        "loans": "Empréstimos",
+        "invoice": "Fatura atual",
+        "used": "Limite usado",
+        "availableCredit": "Disponível",
+        "rate": "Juros",
+        "outstanding": "Saldo devedor",
+        "overdue": "{{days}} dias em atraso",
+        "noItems": "Nenhum produto por aqui.",
+        "guideTitle": "Primeira vez com o assistente?",
+        "guideText": "Veja o que ele sabe fazer, como os pagamentos são confirmados e quando ele chama um atendente.",
+        "guideButton": "Abrir o guia",
+        "safeTitle": "Sua segurança em primeiro lugar",
+        "safeText": "Nenhum pagamento é feito sem a sua confirmação, e a sessão expira sozinha em 15 minutos."
+    },
+    "assistant": {
+        "name": "Assistente LATAM",
+        "status": "Online agora",
+        "open": "Abrir o assistente",
+        "close": "Fechar",
+        "expand": "Ampliar",
+        "shrink": "Reduzir",
+        "newChat": "Nova conversa",
+        "guide": "Guia",
+        "backToChat": "Voltar à conversa",
+        "welcome": "Olá, {{name}}! Como posso ajudar?",
+        "welcomeAnon": "Olá! Como posso ajudar?",
+        "welcomeText": "Consulto saldos, cartões e movimentos, converto moedas e faço transferências e pagamentos, sempre com a sua confirmação.",
+        "tryThis": "Experimente perguntar",
+        "seeGuide": "Primeira vez? Veja o guia",
+        "suggestions": "Sugestões",
+        "placeholder": "Escreva sua mensagem…",
+        "send": "Enviar",
+        "hintKeys": "Enter envia · Shift+Enter quebra a linha",
+        "typing": "O assistente está escrevendo",
+        "confirmTitle": "Confirme a operação",
+        "confirmNote": "Nada é debitado até você confirmar.",
+        "confirm": "Confirmar",
+        "cancel": "Cancelar",
+        "handoffTitle": "Encaminhado para um atendente",
+        "handoffRef": "Referência: {{id}}",
+        "error": "A conversa expirou. Envie sua mensagem novamente.",
+        "prompts": {
+            "balances": {
+                "label": "Ver meus saldos",
+                "text": "Qual é o saldo das minhas contas?"
+            },
+            "cardDue": {
+                "label": "Fatura do cartão",
+                "text": "Quanto devo no cartão de crédito final {{card}}?"
+            },
+            "lastTx": {
+                "label": "Últimos movimentos",
+                "text": "Quais foram minhas últimas 5 transações?"
+            },
+            "payCard": {
+                "label": "Pagar o cartão",
+                "text": "Quero pagar 100 {{currency}} da fatura do cartão final {{card}} com a conta final {{account}}"
+            },
+            "transfer": {
+                "label": "Transferir entre contas",
+                "text": "Quero transferir 100 {{currency}} da conta final {{account}} para a conta final {{account2}}"
+            },
+            "convert": {
+                "label": "Converter moeda",
+                "text": "Quanto são 100 dólares em {{currency}}?"
+            },
+            "declined": {
+                "label": "Compra recusada",
+                "text": "Tenho alguma compra recusada recentemente? Por quê?"
+            },
+            "agent": {
+                "label": "Falar com um atendente",
+                "text": "Quero falar com um atendente"
+            }
+        }
+    },
+    "guide": {
+        "title": "Guia do assistente",
+        "intro": "O assistente responde com os dados reais da sua conta. Veja o que ele faz e toque em um exemplo para experimentar.",
+        "capabilitiesTitle": "O que ele faz",
+        "try": "Experimentar",
+        "cap": {
+            "balances": {
+                "title": "Saldos e cartões",
+                "text": "Saldo de cada conta, fatura e limite disponível do cartão, dias em atraso e vencimento."
+            },
+            "transactions": {
+                "title": "Movimentos",
+                "text": "Últimas transações, busca por data, loja ou valor, e o motivo de uma compra recusada."
+            },
+            "currency": {
+                "title": "Câmbio",
+                "text": "Converte entre dólar e pesos mexicanos, colombianos e argentinos com a cotação do banco."
+            },
+            "payments": {
+                "title": "Transferências e contas",
+                "text": "Transfere entre as suas contas, paga o cartão e paga boletos com código de barras."
+            },
+            "handoff": {
+                "title": "Atendente humano",
+                "text": "Cobrança que você não reconhece, negociação de dívida ou reclamação: ele passa o caso com todo o contexto."
+            }
+        },
+        "paymentsTitle": "Como funcionam os pagamentos",
+        "step1": {
+            "title": "Prévia.",
+            "text": "O banco verifica saldo, limites e destino sem mover dinheiro."
+        },
+        "step2": {
+            "title": "Você confirma.",
+            "text": "Mostramos valor, origem e saldo depois; você toca em Confirmar ou Cancelar."
+        },
+        "step3": {
+            "title": "Execução única.",
+            "text": "O pagamento roda uma vez só, mesmo se você tocar duas vezes."
+        },
+        "step4": {
+            "title": "Comprovante.",
+            "text": "O assistente confere no banco e mostra o número do comprovante."
+        },
+        "tipsTitle": "Dicas",
+        "tip1": "Escreva em português ou espanhol; pode até misturar os dois.",
+        "tip2": "Cite os 4 últimos dígitos da conta ou do cartão para respostas mais rápidas.",
+        "tip3": "Para confirmar um pagamento, use os botões ou responda “sim” ou “não”.",
+        "limitsTitle": "O que ele não faz",
+        "limitsText": "Investimentos, pedidos de empréstimo e mudança de dados cadastrais. Para isso, use os canais oficiais do banco.",
+        "start": "Começar a conversar"
+    }
 }

@@ -5,5 +5,5 @@ export default abstract class AuthModule extends ApiModule {
 
     abstract logout(): Promise<void>;
 
-    abstract getSession(): Promise<{ customerId: string }>;
+    abstract getSession(): Promise<{ customerId: string } | null>;
 }

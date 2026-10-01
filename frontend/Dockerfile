@@ -6,7 +6,8 @@ COPY . .
 # Variáveis VITE_* são embutidas no bundle na hora do build.
 ARG VITE_API_URL=http://localhost:3000
 ARG VITE_SERVICE_KEY=dev-service-key
-ENV VITE_API_URL=$VITE_API_URL VITE_SERVICE_KEY=$VITE_SERVICE_KEY
+ARG VITE_AI_URL=http://localhost:8000
+ENV VITE_API_URL=$VITE_API_URL VITE_SERVICE_KEY=$VITE_SERVICE_KEY VITE_AI_URL=$VITE_AI_URL
 RUN npm run build
 
 FROM nginx:1.29-alpine

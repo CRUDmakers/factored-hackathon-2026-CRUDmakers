@@ -42,11 +42,11 @@
     /* OLD */
     --brand: #0b3d62;
     --brand-2: #1f7a8c;
-    --accent: #f2b705;
+    --old-accent: #f2b705;
     --bg: #f3f5f8;
     --surface: #ffffff;
     --text: #1c2733;
-    --muted: #637282;
+    --old-muted: #637282;
     --line: #dfe4ea;
     --ok: #1b8a4b;
     --ok-bg: #e7f6ee;
@@ -55,19 +55,9 @@
     --warn: #9a6700;
     --warn-bg: #fff6d9;
     --info-bg: #e8f1fb;
-    --radius: 12px;
+    --old-radius: 12px;
     --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 16px rgba(16, 24, 40, 0.06);
     color-scheme: light;
-    font-family:
-        "Segoe UI",
-        system-ui,
-        -apple-system,
-        Roboto,
-        "Helvetica Neue",
-        Arial,
-        sans-serif;
-    color: var(--text);
-    background: var(--bg);
     -webkit-text-size-adjust: 100%;
 }
 
@@ -173,7 +163,6 @@
 }
 body {
     margin: 0;
-    background: var(--bg);
     min-height: 100vh;
 }
 h1,
@@ -200,7 +189,7 @@ a {
 }
 
 .muted {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .small,
 small {
@@ -313,7 +302,7 @@ small {
     flex-direction: column;
     gap: 4px;
     font-size: 0.85rem;
-    color: var(--muted);
+    color: var(--old-muted);
     min-width: 0;
 }
 .field > span {
@@ -358,7 +347,7 @@ input:disabled {
     font-weight: 600;
     padding: 8px 6px;
     border-radius: 8px;
-    color: var(--muted);
+    color: var(--old-muted);
     cursor: pointer;
 }
 .segmented button.active {
@@ -429,7 +418,7 @@ input:disabled {
 }
 .badge-muted {
     background: #eceff3;
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .tag-warn {
     color: var(--warn);
@@ -446,7 +435,7 @@ input:disabled {
     display: flex;
     align-items: center;
     gap: 10px;
-    color: var(--muted);
+    color: var(--old-muted);
     padding: 20px 0;
 }
 .spinner {
@@ -496,7 +485,7 @@ input:disabled {
     gap: 12px;
 }
 .login-brand small {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .demo-banner {
     background: var(--warn-bg);
@@ -511,7 +500,7 @@ input:disabled {
 }
 .shortcuts-title {
     font-size: 0.85rem;
-    color: var(--muted);
+    color: var(--old-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     margin-top: 4px;
@@ -547,7 +536,7 @@ input:disabled {
     grid-row: span 2;
     align-self: center;
     background: var(--brand);
-    color: var(--accent);
+    color: var(--old-accent);
     font-weight: 800;
     font-size: 0.8rem;
     border-radius: 8px;
@@ -560,10 +549,10 @@ input:disabled {
     flex-wrap: wrap;
 }
 .sc-main code {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .shortcuts small {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 
 .lang-switch {
@@ -583,7 +572,7 @@ input:disabled {
     cursor: pointer;
 }
 .lang-switch button.active {
-    background: var(--accent);
+    background: var(--old-accent);
     color: var(--brand);
 }
 
@@ -632,7 +621,7 @@ input:disabled {
     opacity: 0.9;
 }
 .countdown.warn {
-    color: var(--accent);
+    color: var(--old-accent);
     font-weight: 700;
 }
 .tabs {
@@ -658,7 +647,7 @@ input:disabled {
 }
 .tabs a.active {
     color: #fff;
-    border-bottom-color: var(--accent);
+    border-bottom-color: var(--old-accent);
 }
 .tab-icon {
     opacity: 0.8;
@@ -686,7 +675,7 @@ input:disabled {
 
 .card {
     background: var(--surface);
-    border-radius: var(--radius);
+    border-radius: var(--old-radius);
     box-shadow: var(--shadow);
     padding: 18px;
     display: flex;
@@ -705,7 +694,7 @@ input:disabled {
 .hero {
     background: linear-gradient(135deg, var(--brand), var(--brand-2));
     color: #fff;
-    border-radius: var(--radius);
+    border-radius: var(--old-radius);
     padding: 20px;
     display: flex;
     flex-direction: column;
@@ -736,7 +725,7 @@ input:disabled {
     border-radius: 10px;
 }
 .hero-totals small {
-    color: var(--accent);
+    color: var(--old-accent);
     font-weight: 700;
 }
 .product-list {
@@ -761,7 +750,7 @@ input:disabled {
     min-width: 0;
 }
 .product-list small {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .amount {
     text-align: right;
@@ -769,7 +758,7 @@ input:disabled {
     flex-direction: column;
 }
 .amount small {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .grid-cards {
     display: grid;
@@ -799,7 +788,7 @@ input:disabled {
     font-size: 0.9rem;
 }
 .credit-card dt {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .credit-card dd {
     margin: 0;
@@ -811,7 +800,7 @@ input:disabled {
     flex-wrap: wrap;
     gap: 4px 12px;
     font-size: 0.8rem;
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .meter {
     height: 8px;
@@ -893,7 +882,7 @@ input:disabled {
     white-space: nowrap;
 }
 .tx-main small {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .tx-main small.neg {
     color: var(--bad);
@@ -911,7 +900,7 @@ input:disabled {
     align-items: center;
     gap: 8px;
     font-size: 0.9rem;
-    color: var(--muted);
+    color: var(--old-muted);
 }
 
 .modal-backdrop {
@@ -961,7 +950,7 @@ input:disabled {
     font-size: 0.92rem;
 }
 .kv dt {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .kv dd {
     margin: 0;
@@ -988,7 +977,7 @@ input:disabled {
     font-weight: 700;
     font-size: 0.85rem;
     background: #eef2f6;
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .steps li.active {
     background: var(--brand);
@@ -1076,7 +1065,7 @@ input:disabled {
     flex-direction: column;
 }
 .stats small {
-    color: var(--muted);
+    color: var(--old-muted);
 }
 .bars {
     list-style: none;
@@ -1146,7 +1135,7 @@ input:disabled {
     z-index: 40;
     border: 0;
     border-radius: 999px;
-    background: var(--accent);
+    background: var(--old-accent);
     color: var(--brand);
     font: inherit;
     font-weight: 800;

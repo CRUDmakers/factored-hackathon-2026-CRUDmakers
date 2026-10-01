@@ -4,12 +4,12 @@ import { lazy } from "react";
 import SessionProvider from "./contexts/session/session-provider";
 
 import AuthLayout from "./layouts/auth/auth-layout";
+import SessionLayout from "./layouts/session/session-layout";
 
 const LoginPage = lazy(() => import("./pages/auth/login/login-page"));
 
 const HomePage = lazy(() => import("./pages/session/home/home-page"));
 
-import { Assistant } from "./pages/Assistant";
 import { Exchange } from "./pages/Exchange";
 import { Home } from "./pages/Home";
 import { Pay } from "./pages/Pay";
@@ -32,12 +32,11 @@ export default function AppRouter() {
                     <Route path="reset-password" />
                 </Route>
 
-                <Route path="/session" element={<SessionProvider children={<Outlet />} />}>
+                <Route path="/session" element={<SessionProvider children={<SessionLayout />} />}>
                     <Route path="home" element={<HomePage />} />
                 </Route>
 
                 <Route path="/app" element={<Outlet />}>
-                    <Route path="assistant" element={<Assistant />} />
                     <Route path="exchange" element={<Exchange />} />
                     <Route path="home" element={<Home />} />
                     <Route path="login" element={<Login />} />

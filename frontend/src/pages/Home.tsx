@@ -4,55 +4,12 @@ import { Card, day, ErrorBox, Loading, money, num, useAsync } from "../ui";
 
 export function Home() {
     const { t, tv, lang } = useI18n();
-    //const { data, error, loading, reload } = useAsync(() => api.balances(), []);
+    const { data, error, reload } = useAsync(() => api.balances(), []);
 
     const today = new Date().toISOString().slice(0, 10);
-    //if (error) return <ErrorBox error={error} onRetry={reload} />;
-    //if (!data) return null;
+    if (error) return <ErrorBox error={error} onRetry={reload} />;
+    if (!data) return <Loading />;
 
-    const data = {
-        customer_id: "CLI-123456",
-        accounts: [
-            {
-                product_id: "1",
-                product_type: "1",
-                product_number: null,
-                currency: "USD",
-                status: "Active",
-                balance: 1000,
-            },
-        ],
-        credit_cards: [
-            {
-                product_id: "1",
-                product_number: null,
-                currency: "USD",
-                status: "Active",
-                invoice_amount: 100,
-                credit_limit: 1000,
-                available_credit: 900,
-                utilization_pct: 10,
-                interest_rate: 15,
-                expiration_date: null,
-                days_past_due: null,
-            },
-        ],
-        loans: [
-            {
-                product_id: "1",
-                product_type: "Personal Loan",
-                currency: "USD",
-                status: "Active",
-                outstanding_balance: 5000,
-                interest_rate: 5,
-                expiration_date: null,
-                days_past_due: null,
-            },
-        ],
-        investments: [{ product_id: "1", product_type: "Stocks", currency: "USD", balance: undefined }],
-        totals_by_currency: [{ currency: "USD", available_funds: 1000, investments: 0, debt: 5000, net: -4000 }],
-        net_worth_usd: -4000,
-    };
     return (
         <div className="stack-lg">
             <div className="hero">

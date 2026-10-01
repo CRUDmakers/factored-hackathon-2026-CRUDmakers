@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, endSession, expireLocally, getSession, setSessionLostHandler, type Customer, type Session } from './api';
 import { I18nContext, initialLang, makeI18n, persistLang, useI18n, type Lang, type MessageKey } from './i18n';
-import { Assistant } from './pages/Assistant';
 import { Exchange } from './pages/Exchange';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
@@ -97,7 +96,6 @@ function Shell({ session, onLogout }: { session: Session; onLogout: () => void }
   const { t } = useI18n();
   const [route, setRoute] = useState<Route>(readRoute);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [assistantOpen, setAssistantOpen] = useState(false);
 
   useEffect(() => {
     const onHash = () => setRoute(readRoute());
@@ -169,7 +167,6 @@ function Shell({ session, onLogout }: { session: Session; onLogout: () => void }
         {route === 'fx' && <Exchange />}
       </main>
 
-      <Assistant open={assistantOpen} onToggle={() => setAssistantOpen((o) => !o)} />
     </div>
   );
 }

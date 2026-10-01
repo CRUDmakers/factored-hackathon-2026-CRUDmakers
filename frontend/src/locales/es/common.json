@@ -1,4 +1,157 @@
 {
     "enter": "Entrar",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "retry": "Reintentar",
+    "logout": "Salir",
+    "session": {
+        "expired": "Su sesión expiró. Ingrese nuevamente.",
+        "invalid": "Su sesión ya no es válida. Ingrese nuevamente."
+    },
+    "nav": {
+        "home": "Inicio",
+        "assistant": "Asistente",
+        "guide": "Guía del asistente",
+        "language": "Idioma"
+    },
+    "home": {
+        "hello": "Hola, {{name}}",
+        "helloAnon": "Hola",
+        "netWorth": "Patrimonio neto",
+        "netWorthHint": "Suma de cuentas, inversiones y deudas, convertida a dólares",
+        "available": "Disponible",
+        "debt": "Deudas",
+        "transfer": "Transferir",
+        "askAssistant": "Hablar con el asistente",
+        "quickTitle": "Pídaselo al asistente",
+        "quickSubtitle": "Un clic y responde con los datos de su cuenta.",
+        "accounts": "Cuentas",
+        "cards": "Tarjetas de crédito",
+        "loans": "Préstamos",
+        "invoice": "Saldo a pagar",
+        "used": "Límite usado",
+        "availableCredit": "Disponible",
+        "rate": "Tasa",
+        "outstanding": "Saldo pendiente",
+        "overdue": "{{days}} días de atraso",
+        "noItems": "No hay productos aquí.",
+        "guideTitle": "¿Primera vez con el asistente?",
+        "guideText": "Vea lo que sabe hacer, cómo se confirman los pagos y cuándo lo comunica con un agente.",
+        "guideButton": "Abrir la guía",
+        "safeTitle": "Su seguridad primero",
+        "safeText": "Ningún pago se realiza sin su confirmación, y la sesión expira sola en 15 minutos."
+    },
+    "assistant": {
+        "name": "Asistente LATAM",
+        "status": "En línea",
+        "open": "Abrir el asistente",
+        "close": "Cerrar",
+        "expand": "Ampliar",
+        "shrink": "Reducir",
+        "newChat": "Nueva conversación",
+        "guide": "Guía",
+        "backToChat": "Volver a la conversación",
+        "welcome": "¡Hola, {{name}}! ¿En qué le ayudo?",
+        "welcomeAnon": "¡Hola! ¿En qué le ayudo?",
+        "welcomeText": "Consulto saldos, tarjetas y movimientos, convierto monedas y hago transferencias y pagos, siempre con su confirmación.",
+        "tryThis": "Pruebe preguntar",
+        "seeGuide": "¿Primera vez? Vea la guía",
+        "suggestions": "Sugerencias",
+        "placeholder": "Escriba su mensaje…",
+        "send": "Enviar",
+        "hintKeys": "Enter envía · Shift+Enter nueva línea",
+        "typing": "El asistente está escribiendo",
+        "confirmTitle": "Confirme la operación",
+        "confirmNote": "No se debita nada hasta que usted confirme.",
+        "confirm": "Confirmar",
+        "cancel": "Cancelar",
+        "handoffTitle": "Derivado a un agente",
+        "handoffRef": "Referencia: {{id}}",
+        "error": "La conversación expiró. Envíe su mensaje nuevamente.",
+        "prompts": {
+            "balances": {
+                "label": "Ver mis saldos",
+                "text": "¿Cuál es el saldo de mis cuentas?"
+            },
+            "cardDue": {
+                "label": "Saldo de la tarjeta",
+                "text": "¿Cuánto debo en la tarjeta de crédito terminada en {{card}}?"
+            },
+            "lastTx": {
+                "label": "Últimos movimientos",
+                "text": "¿Cuáles fueron mis últimas 5 transacciones?"
+            },
+            "payCard": {
+                "label": "Pagar la tarjeta",
+                "text": "Quiero pagar 100 {{currency}} de la tarjeta terminada en {{card}} con la cuenta terminada en {{account}}"
+            },
+            "transfer": {
+                "label": "Transferir entre cuentas",
+                "text": "Quiero transferir 100 {{currency}} de la cuenta terminada en {{account}} a la cuenta terminada en {{account2}}"
+            },
+            "convert": {
+                "label": "Convertir moneda",
+                "text": "¿Cuánto son 100 dólares en {{currency}}?"
+            },
+            "declined": {
+                "label": "Compra rechazada",
+                "text": "¿Tengo alguna compra rechazada recientemente? ¿Por qué?"
+            },
+            "agent": {
+                "label": "Hablar con un agente",
+                "text": "Quiero hablar con un agente"
+            }
+        }
+    },
+    "guide": {
+        "title": "Guía del asistente",
+        "intro": "El asistente responde con los datos reales de su cuenta. Vea lo que hace y toque un ejemplo para probarlo.",
+        "capabilitiesTitle": "Lo que hace",
+        "try": "Probar",
+        "cap": {
+            "balances": {
+                "title": "Saldos y tarjetas",
+                "text": "Saldo de cada cuenta, deuda y crédito disponible de la tarjeta, días de atraso y vencimiento."
+            },
+            "transactions": {
+                "title": "Movimientos",
+                "text": "Últimas transacciones, búsqueda por fecha, comercio o monto, y el motivo de una compra rechazada."
+            },
+            "currency": {
+                "title": "Tipo de cambio",
+                "text": "Convierte entre dólares y pesos mexicanos, colombianos y argentinos con la tasa del banco."
+            },
+            "payments": {
+                "title": "Transferencias y pagos",
+                "text": "Transfiere entre sus cuentas, paga la tarjeta y paga facturas con código de barras."
+            },
+            "handoff": {
+                "title": "Agente humano",
+                "text": "Un cargo que no reconoce, negociar una deuda o una queja: le pasa el caso con todo el contexto."
+            }
+        },
+        "paymentsTitle": "Cómo funcionan los pagos",
+        "step1": {
+            "title": "Vista previa.",
+            "text": "El banco revisa saldo, límites y destino sin mover dinero."
+        },
+        "step2": {
+            "title": "Usted confirma.",
+            "text": "Mostramos monto, origen y saldo después; toque Confirmar o Cancelar."
+        },
+        "step3": {
+            "title": "Una sola ejecución.",
+            "text": "El pago se realiza una única vez, aunque toque dos veces."
+        },
+        "step4": {
+            "title": "Comprobante.",
+            "text": "El asistente lo verifica en el banco y le muestra el número de comprobante."
+        },
+        "tipsTitle": "Consejos",
+        "tip1": "Escriba en español o portugués; puede incluso mezclarlos.",
+        "tip2": "Mencione los últimos 4 dígitos de la cuenta o la tarjeta para respuestas más rápidas.",
+        "tip3": "Para confirmar un pago, use los botones o responda “sí” o “no”.",
+        "limitsTitle": "Lo que no hace",
+        "limitsText": "Inversiones, solicitudes de préstamo y cambios de datos personales. Para eso, use los canales oficiales del banco.",
+        "start": "Empezar a conversar"
+    }
 }

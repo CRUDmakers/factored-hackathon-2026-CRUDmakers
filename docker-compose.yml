@@ -68,10 +68,12 @@ services:
       args:
         VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:3000}
         VITE_SERVICE_KEY: ${FRONTEND_SERVICE_KEY:-${AUTH_SERVICE_KEY:-demo-service-key}}
+        VITE_AI_URL: ${FRONTEND_AI_URL:-http://localhost:8000}
     ports:
       - "5173:80"
     depends_on:
       - api
+      - ai-backend
 
   # Assistente de IA (Backend 2): http://localhost:8000/v1/health · contrato do chat em ai-backend/CHAT_API.md
   # - Cria o próprio banco `ai_backend` neste Postgres ao subir (conversas, checkpoints, traces, handoffs).

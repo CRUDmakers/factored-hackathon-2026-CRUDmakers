@@ -4,6 +4,8 @@
  */
 
 export const API_URL = (import.meta.env.VITE_API_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+/** Backend 2 (assistente de IA). Usa o mesmo token de sessão; contrato em ai-backend/CHAT_API.md. */
+export const AI_URL = (import.meta.env.VITE_AI_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 /** Chave do provedor de identidade de TESTE. Exposta no bundle: aceitável só para a demo. */
 const SERVICE_KEY = import.meta.env.VITE_SERVICE_KEY ?? 'dev-service-key';
 
@@ -67,8 +69,8 @@ export function getSession() {
 
 type Query = Record<string, string | number | boolean | undefined | null>;
 
-function buildUrl(path: string, query?: Query) {
-  const url = new URL(API_URL + path);
+function buildUrl(path: string, query?: Query, base = API_URL) {
+  const url = new URL(base + path);
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
   }
@@ -78,7 +80,7 @@ function buildUrl(path: string, query?: Query) {
 async function request<T>(
   method: string,
   path: string,
-  opts: { query?: Query; body?: unknown; headers?: Record<string, string>; auth?: boolean } = {},
+  opts: { query?: Query; body?: unknown; headers?: Record<string, string>; auth?: boolean; base?: string } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { ...opts.headers };
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
@@ -86,13 +88,13 @@ async function request<T>(
 
   let res: Response;
   try {
-    res = await fetch(buildUrl(path, opts.query), {
+    res = await fetch(buildUrl(path, opts.query, opts.base), {
       method,
       headers,
       body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     });
   } catch {
-    throw new ApiError(0, 'network_error', `Não foi possível conectar à API (${API_URL}).`);
+    throw new ApiError(0, 'network_error', `Não foi possível conectar à API (${opts.base ?? API_URL}).`);
   }
 
   if (res.status === 204) return undefined as T;
@@ -391,6 +393,23 @@ export interface Conversion {
   };
 }
 
+export interface ChatRequest {
+  conversation_id?: string;
+  message?: string;
+  confirmation?: { action_id: string; decision: 'approve' | 'reject' };
+}
+
+export interface ChatResponse {
+  conversation_id: string;
+  turn_id: string;
+  status: 'answered' | 'awaiting_confirmation' | 'handed_off' | 'refused';
+  message: string;
+  language: 'es' | 'pt';
+  pending_action: { action_id: string; summary: string; preview: PaymentResult; expires_at: string } | null;
+  handoff: { handoff_id: string } | null;
+  trace_id: string;
+}
+
 // ---------- endpoints ----------
 
 const PAYMENT_PATH: Record<PaymentMethod, string> = {
@@ -415,4 +434,5 @@ export const api = {
   spending: (query: Query) => request<Spending>('GET', customerPath('/reports/spending'), { query }),
   convert: (query: { from: string; to: string; amount: number }) =>
     request<Conversion>('GET', '/api/exchange-rates/convert', { query, auth: false }),
+  chat: (body: ChatRequest) => request<ChatResponse>('POST', '/v1/chat', { body, base: AI_URL }),
 };
