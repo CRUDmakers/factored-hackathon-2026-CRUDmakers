@@ -202,7 +202,19 @@
         "csvCategory": "Categoria",
         "csvTransactions": "Transações",
         "tx_one": "{{count}} transação",
-        "tx_other": "{{count}} transações"
+        "tx_other": "{{count}} transações",
+        "ai": {
+            "analyze": "Analisar com IA",
+            "askCategory": "Perguntar ao assistente sobre estes gastos",
+            "analyzeText": "Resumo dos meus gastos por categoria de {{from}} a {{to}}{{scope}}: para onde vai meu dinheiro e como gastar menos?",
+            "categoryText": "Mostre minhas transações de {{category}} de {{from}} a {{to}}{{scope}} e me explique esses gastos.",
+            "onCard": " no cartão final {{last4}}",
+            "onAccount": " na conta final {{last4}}",
+            "onProduct": " no produto final {{last4}}"
+        },
+        "drill": {
+            "partial": "Mostrando as {{shown}} mais recentes de {{total}} transações aprovadas desta categoria."
+        }
     },
     "cat": {
         "Food": "Alimentação",

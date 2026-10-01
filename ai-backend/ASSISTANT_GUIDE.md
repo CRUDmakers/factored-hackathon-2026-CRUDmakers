@@ -144,6 +144,24 @@ Marta (`CLI-25NDK326VNE4`, demo data from `backend/scripts/seed-marta-recurring.
 >
 > **Assistant** · `answered`: Resultado de los pagos: one line per payment, each with its receipt (`TRX-…`).
 
+## Spending and saving tips
+
+The assistant summarises what the customer spent in a period (whole calendar months by default), by month with the change from the previous month, by category and by card or account, then gives 2 to 4 budgeting tips tied to those figures. It can also list the transactions behind a category. The **Meus gastos / Mis gastos** page opens it with the period, card and category already filled in ("Analisar com IA", and "Perguntar ao assistente sobre estes gastos" under each category).
+
+**Behind the answer:** `get_spending_summary` reads Node's `GET /reports/spending` (approved purchases, withdrawals, transfers and payments, in USD at each transaction's date); `search_transactions` lists a category's transactions, optionally for one card (`product_id`). The prompt (`system_v6`) forbids the model from adding up amounts or estimating savings: every figure is quoted from a tool. Tips stay on budgeting habits: no investment, credit or tax advice, and no bank products.
+
+Marta (`CLI-25NDK326VNE4`), card 6411 (ES, abridged):
+
+> **Customer:** Resumen de mis gastos por categoría del 01/04/2026 al 30/09/2026 en la tarjeta terminada en 6411: ¿en qué se me va la plata y cómo gastar menos?
+>
+> **Assistant** · `answered`: Total gastado: 815.74 USD (promedio mensual de 135.96 USD). Salud: 425.34 USD (52.14% del total, 1 transacción); Transporte: 390.40 USD (47.86%). Todo el gasto se concentró en mayo de 2026… Consejos: 1. Planificar gastos de salud atípicos… 2. Revisar alternativas de transporte… 3. Establecer un tope de consumo mensual…
+
+> **Customer:** Mostre minhas transações de Serviços de 01/04/2026 a 30/09/2026 e me explique esses gastos.
+>
+> **Assistant** · `answered`: 21/05/2026 – Servicios Públicos – 812.964,92 COP; 25/04/2026 – Cable TV – 89.416,30 COP. O que mais se destaca é a cobrança de Servicios Públicos em maio…
+
+**Known limitation:** the route classifier was trained before this feature, so a free-typed request for saving advice ("¿cómo puedo ahorrar dinero?") is still refused as out of scope. The page's prompts are worded so the current model routes them to `answer` (checked on 90+ variants of period, card and category in both languages). Adding saving-advice families to `classifier_data/templates.yaml` fixes it, but needs a new split and a new report.
+
 ## When it asks a clarifying question
 
 If a request matches several records, or is missing the account, the amount or the destination, the assistant asks instead of guessing.

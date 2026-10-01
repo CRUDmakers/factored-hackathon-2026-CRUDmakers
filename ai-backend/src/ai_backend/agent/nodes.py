@@ -51,7 +51,7 @@ from ai_backend.tools.payments import (
 )
 from ai_backend.tools.recurring import batch_confirmation_summary, batch_result_message
 
-PROMPT_VERSION = "system_v5"
+PROMPT_VERSION = "system_v6"
 ROUTING_NOTES = {
     "possible_human": (
         "\n## Routing note\nA triage model thinks this message may need a human agent (fraud, "

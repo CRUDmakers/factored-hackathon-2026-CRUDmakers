@@ -16,7 +16,8 @@ import useSession from "@/contexts/session/use-session";
 export type PromptKey = "balances" | "recurring" | "cardDue" | "lastTx" | "payCard" | "transfer" | "convert" | "declined" | "agent";
 
 export type Prompt = {
-    key: PromptKey;
+    /** "spending": built on the spending page from the period, card and category on screen. */
+    key: PromptKey | "spending";
     icon: LucideIcon;
     label: string;
     text: string;

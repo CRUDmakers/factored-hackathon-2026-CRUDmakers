@@ -26,6 +26,7 @@ from ai_backend.bank.client import (
 from ai_backend.bank.models import (
     Channel,
     Currency,
+    SpendingQuery,
     TransactionDetailPolicyView,
     TransactionQuery,
     TransactionStatus,
@@ -145,6 +146,12 @@ class SearchTransactionsArgs(_Args):
         "Transfers or Uncategorized.",
     )
     channel: Channel | None = None
+    product_id: str | None = Field(
+        default=None,
+        pattern=r"^PRD-",
+        description="Only this card or account: a PRD-… id from get_balances or "
+        "get_spending_summary.",
+    )
     merchant: str | None = Field(
         default=None, description="Part of the merchant or biller name, any case."
     )
@@ -176,6 +183,7 @@ async def search_transactions(ctx: ToolContext, args: SearchTransactionsArgs) ->
         status=args.status,
         category=args.category,
         channel=args.channel,
+        product_id=args.product_id,
     )
     if not args.needs_local_filter():
         page = await ctx.bank.list_transactions(
@@ -224,6 +232,7 @@ def _filtered(args: SearchTransactionsArgs) -> bool:
             args.status,
             args.category,
             args.channel,
+            args.product_id,
             args.merchant,
             args.min_amount,
             args.max_amount,
@@ -254,6 +263,108 @@ def _item_view(t: Any) -> dict[str, Any]:
     if row["transaction_status"] != "Declined":
         row["response_code"] = None
     return row
+
+
+# ---------- get_spending_summary ----------
+
+
+class GetSpendingSummaryArgs(_Args):
+    date_from: date | None = Field(
+        default=None,
+        description="First day, inclusive (YYYY-MM-DD). Leave it out to get whole calendar "
+        "months (see months).",
+    )
+    date_to: date | None = Field(
+        default=None,
+        description="Last day, inclusive. Default: the customer's latest transaction.",
+    )
+    months: int | None = Field(
+        default=None,
+        ge=1,
+        le=12,
+        description="Without date_from: how many whole calendar months, ending at date_to. "
+        "Default 3.",
+    )
+    product_id: str | None = Field(
+        default=None,
+        pattern=r"^PRD-",
+        description="Only this card or account (a PRD-… id from get_balances or by_product).",
+    )
+
+    @model_validator(mode="after")
+    def _range(self) -> GetSpendingSummaryArgs:
+        if self.date_from and self.date_to and self.date_from > self.date_to:
+            raise ValueError("date_from must be on or before date_to")
+        return self
+
+
+def _str(value: Decimal | None) -> str | None:
+    return None if value is None else str(value)
+
+
+async def get_spending_summary(ctx: ToolContext, args: GetSpendingSummaryArgs) -> ToolResult:
+    r = await ctx.bank.get_spending(ctx.session, SpendingQuery(**args.model_dump()))
+    period = f"{r.period.from_}..{r.period.to}"
+    label = {
+        p.product_id: f"{p.product_type or 'No product'} {last4(p.product_number) or ''}".strip()
+        for p in r.by_product
+    }
+    scope = label.get(r.product_id, r.product_id) if r.product_id else "all cards and accounts"
+    data = {
+        "period": {"from": r.period.from_.isoformat(), "to": r.period.to.isoformat()},
+        "scope": scope,
+        "currency": "USD (each transaction converted at its date's rate)",
+        "total_spent_usd": str(r.total_spent_usd),
+        "monthly_average_usd": str(r.monthly_average_usd),
+        "by_month": [
+            {
+                "month": m.month,
+                "total_usd": str(m.total_usd),
+                "change_pct_vs_previous": _str(m.change_pct),
+            }
+            for m in r.by_month
+        ],
+        "by_category": [c.model_dump(mode="json") for c in r.by_category],
+        "by_product": [
+            {
+                "product_id": p.product_id,
+                "product": label[p.product_id],
+                "total_usd": str(p.total_usd),
+                "share_pct": _str(p.share_pct),
+                "by_month_usd": {m.month: str(m.total_usd) for m in p.by_month},
+            }
+            for p in r.by_product
+        ],
+    }
+    facts = [
+        Fact(f"Spent {r.total_spent_usd} USD in {period} ({scope})", "get_spending_summary"),
+        *(
+            Fact(
+                f"{c.category}: {c.total_usd} USD, {c.count} transactions, {c.share_pct}% "
+                f"({period}, {scope})",
+                "get_spending_summary",
+            )
+            for c in r.by_category
+        ),
+        *(
+            Fact(
+                f"{m.month}: {m.total_usd} USD"
+                + (f" ({m.change_pct}% vs previous month)" if m.change_pct is not None else "")
+                + f" ({scope})",
+                "get_spending_summary",
+            )
+            for m in r.by_month
+        ),
+        *(
+            Fact(
+                f"{label[p.product_id]}: {p.total_usd} USD in {period}",
+                "get_spending_summary",
+                p.product_id,
+            )
+            for p in r.by_product
+        ),
+    ]
+    return ToolResult(ok=True, data=data, facts=facts)
 
 
 # ---------- get_transaction ----------
@@ -419,6 +530,18 @@ P0_READ_TOOLS: tuple[ToolSpec, ...] = (
         SearchTransactionsArgs,
         "read",
         search_transactions,
+    ),
+    ToolSpec(
+        "get_spending_summary",
+        "The customer's spending (approved purchases, withdrawals, transfers and payments) in "
+        "USD for a period: total, monthly average, each month with its change vs the previous "
+        "month, each category (amount, number of transactions, share) and each card or account. "
+        "Use it for 'how much do I spend', 'where does my money go', trends, comparing months "
+        "or cards, and before any advice on spending less. Use search_transactions to list the "
+        "transactions behind a category.",
+        GetSpendingSummaryArgs,
+        "read",
+        get_spending_summary,
     ),
     ToolSpec(
         "get_transaction",

@@ -25,7 +25,12 @@ from ai_backend.auth.session import Session
 from ai_backend.bank.client import AuthExpired, BankClient, BankRejected, NotFound
 from ai_backend.bank.fake_client import CustomerInactive, FakeBankClient
 from ai_backend.bank.http_client import HttpBankClient
-from ai_backend.bank.models import PaymentRequest, TransactionQuery, TransferDestination
+from ai_backend.bank.models import (
+    PaymentRequest,
+    SpendingQuery,
+    TransactionQuery,
+    TransferDestination,
+)
 from ai_backend.config import Retries
 
 FIXTURE = Path(__file__).parents[2] / "eval" / "fixtures" / "data"
@@ -137,6 +142,22 @@ async def test_transactions_newest_first_and_filtered(env):
     assert 0 < len(dates) <= 5 and dates == sorted(dates, reverse=True)
     declined = await env.bank.list_transactions(s, TransactionQuery(status="Declined"))
     assert declined.items and all(t.transaction_status == "Declined" for t in declined.items)
+
+
+async def test_spending_shape(env):
+    s = await env.login(FRANCISCO)
+    r = await env.bank.get_spending(s, SpendingQuery(months=6))
+    assert r.period.from_.day == 1 and len(r.by_month) == 6
+    assert all(len(p.by_month) == 6 for p in r.by_product)
+    total = sum((p.total_usd for p in r.by_product), Decimal(0))
+    assert abs(total - r.total_spent_usd) <= Decimal("0.05")  # per-row rounding
+    card = next(
+        (p for p in r.by_product if p.product_type in ("Tarjeta Crédito", "Tarjeta Débito")), None
+    )
+    if card:
+        assert card.product_number.startswith("••••")
+        one = await env.bank.get_spending(s, SpendingQuery(months=6, product_id=card.product_id))
+        assert one.total_spent_usd == card.total_usd and one.by_product == r.by_product
 
 
 async def test_detail_of_own_transaction(env):

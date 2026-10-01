@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { Download, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronDown, Download, Minus, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import type { TFunction } from "i18next";
 import { cn } from "cn";
 import { api, type Spending } from "@/api";
+import { useAssistant } from "@/components/assistant/assistant";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,10 @@ type Product = Spending["by_product"][number];
 type Period = { months: number } | { from: string; to: string };
 
 const PRESETS = [3, 6, 12];
+// What the report counts as spending (backend/src/services/transactions.ts OUTFLOW_TYPES).
+const OUTFLOW = ["Purchase", "Withdrawal", "Transfer", "Payment"];
+/** "2026-04-01" → "01/04/2026": the date format the assistant prompts were tested with. */
+const dmy = (iso: string) => iso.split("-").reverse().join("/");
 const mask = (n: string | null) => (n ? `•••• ${n.slice(-4)}` : "");
 
 /** "YYYY-MM-DD" is the last day of its month? */
@@ -33,6 +38,8 @@ export default function SpendingPage() {
     const [period, setPeriod] = useState<Period>({ months: 6 });
     const [draft, setDraft] = useState({ from: "", to: "" });
     const [productId, setProductId] = useState("");
+    const [openCategory, setOpenCategory] = useState("");
+    const assistant = useAssistant();
     const { data, loading } = useAsync(() => api.spending({ ...period, product_id: productId }), [period, productId]);
 
     const usd = (v: number) => money(v, "USD", lang);
@@ -43,6 +50,19 @@ export default function SpendingPage() {
     const label = (ns: "cat" | "product", key: string | null) =>
         key ? t(`${ns}.${key}` as "cat.Food", { defaultValue: key }) : t("spending.noProduct");
     const productLabel = (p: Product) => `${label("product", p.product_type)} ${mask(p.product_number)}`.trim();
+
+    // The assistant's tools fetch the figures again: prompts carry only the period, card and category.
+    const scope = (p?: Product) => {
+        if (!p?.product_number) return "";
+        const kind = p.product_type?.startsWith("Tarjeta")
+            ? "onCard"
+            : p.product_type?.startsWith("Cuenta")
+              ? "onAccount"
+              : "onProduct";
+        return t(`spending.ai.${kind}`, { last4: p.product_number.slice(-4) });
+    };
+    const ask = (text: string) =>
+        assistant.open({ prompt: { key: "spending", icon: Sparkles, label: text, text, send: true } });
 
     const applyCustom = (e: FormEvent) => {
         e.preventDefault();
@@ -61,9 +81,28 @@ export default function SpendingPage() {
 
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 pb-24 sm:p-6 sm:pb-24">
-            <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold">{t("spending.title")}</h1>
-                <span className="text-muted-foreground text-sm">{t("spending.subtitle")}</span>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+                <div className="flex flex-col gap-1">
+                    <h1 className="text-2xl font-semibold">{t("spending.title")}</h1>
+                    <span className="text-muted-foreground text-sm">{t("spending.subtitle")}</span>
+                </div>
+                <Button
+                    size="lg"
+                    className="sm:ms-auto"
+                    disabled={!data}
+                    onClick={() =>
+                        data &&
+                        ask(
+                            t("spending.ai.analyzeText", {
+                                from: dmy(data.period.from),
+                                to: dmy(data.period.to),
+                                scope: scope(selected),
+                            })
+                        )
+                    }
+                >
+                    <Sparkles /> {t("spending.ai.analyze")}
+                </Button>
             </div>
 
             {/* Filters */}
@@ -240,8 +279,21 @@ export default function SpendingPage() {
                                 )}
                                 {data.by_category.map((c) => (
                                     <div key={c.category} className="flex flex-col gap-1">
-                                        <div className="flex items-baseline justify-between gap-2 text-sm">
+                                        <button
+                                            type="button"
+                                            aria-expanded={openCategory === c.category}
+                                            onClick={() =>
+                                                setOpenCategory(openCategory === c.category ? "" : c.category)
+                                            }
+                                            className="hover:text-primary flex items-baseline justify-between gap-2 text-start text-sm"
+                                        >
                                             <span className="font-medium">
+                                                <ChevronDown
+                                                    className={cn(
+                                                        "me-1 inline size-3.5 transition-transform",
+                                                        openCategory !== c.category && "-rotate-90"
+                                                    )}
+                                                />
                                                 {label("cat", c.category)}{" "}
                                                 <span className="text-muted-foreground text-xs font-normal">
                                                     {t("spending.tx", { count: c.count })}
@@ -253,13 +305,36 @@ export default function SpendingPage() {
                                                     {num(c.share_pct, lang, 1)}%
                                                 </span>
                                             </span>
-                                        </div>
+                                        </button>
                                         <div className="bg-muted h-2 overflow-hidden rounded-full">
                                             <div
                                                 className="bg-primary h-full rounded-full"
                                                 style={{ width: `${(c.total_usd / maxCat) * 100}%` }}
                                             />
                                         </div>
+                                        {openCategory === c.category && (
+                                            <CategoryTransactions
+                                                category={c.category}
+                                                from={data.period.from}
+                                                to={data.period.to}
+                                                productId={productId}
+                                                productName={(id) => {
+                                                    const p = data.by_product.find((x) => x.product_id === id);
+                                                    return p ? productLabel(p) : "";
+                                                }}
+                                                lang={lang}
+                                                onAsk={() =>
+                                                    ask(
+                                                        t("spending.ai.categoryText", {
+                                                            category: label("cat", c.category),
+                                                            from: dmy(data.period.from),
+                                                            to: dmy(data.period.to),
+                                                            scope: scope(selected),
+                                                        })
+                                                    )
+                                                }
+                                            />
+                                        )}
                                     </div>
                                 ))}
                             </CardContent>
@@ -342,6 +417,65 @@ export default function SpendingPage() {
                     </Card>
                 </div>
             )}
+        </div>
+    );
+}
+
+/** The transactions behind one category of the report: same period, card and rules (approved outflows). */
+function CategoryTransactions(props: {
+    category: string;
+    from: string;
+    to: string;
+    productId: string;
+    productName: (productId: string | null) => string;
+    lang: "es" | "pt";
+    onAsk: () => void;
+}) {
+    const { t } = useTranslation();
+    const { category, from, to, productId, lang } = props;
+    const { data } = useAsync(
+        () => api.transactions({ category, from, to, product_id: productId, status: "Approved", limit: 200 }),
+        [category, from, to, productId]
+    );
+    const rows = data?.items.filter((tx) => OUTFLOW.includes(tx.transaction_type ?? ""));
+
+    return (
+        <div className="bg-muted/40 mt-1 flex flex-col gap-2 rounded-lg p-3">
+            {!rows ? (
+                <span className="text-muted-foreground text-xs">{t("loading")}</span>
+            ) : (
+                <ul className="flex flex-col divide-y">
+                    {rows.map((tx) => (
+                        <li key={tx.transaction_id} className="flex items-baseline gap-3 py-1.5 text-xs">
+                            <span className="text-muted-foreground w-16 shrink-0 tabular-nums">
+                                {day(tx.transaction_date, lang)}
+                            </span>
+                            <span className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate font-medium">
+                                    {tx.merchant_name ?? tx.description ?? tx.transaction_type}
+                                </span>
+                                <span className="text-muted-foreground truncate">
+                                    {props.productName(tx.product_id)}
+                                </span>
+                            </span>
+                            <span className="flex flex-col text-end tabular-nums">
+                                <span>{money(tx.amount, tx.currency, lang)}</span>
+                                {tx.currency !== "USD" && tx.amount_usd != null && (
+                                    <span className="text-muted-foreground">{money(tx.amount_usd, "USD", lang)}</span>
+                                )}
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {data && data.total > data.items.length && (
+                <span className="text-muted-foreground text-xs">
+                    {t("spending.drill.partial", { shown: data.items.length, total: data.total })}
+                </span>
+            )}
+            <Button variant="outline" size="sm" className="w-fit" onClick={props.onAsk}>
+                <Sparkles /> {t("spending.ai.askCategory")}
+            </Button>
         </div>
     );
 }

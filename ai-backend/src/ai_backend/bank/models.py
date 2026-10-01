@@ -455,6 +455,79 @@ class RecurringPayments(_Response):
     summary: RecurringSummary
 
 
+# ---------- spending ----------
+
+
+class SpendingQuery(_Request):
+    """`GET /reports/spending` filters. Without `date_from`: `months` whole calendar months up to
+    `date_to` (Node's default: 3, ending on the customer's latest transaction)."""
+
+    date_from: Date | None = None
+    date_to: Date | None = None
+    months: int | None = Field(default=None, ge=1, le=36)
+    product_id: str | None = None
+
+    @model_validator(mode="after")
+    def _range(self) -> Self:
+        if self.date_from and self.date_to and self.date_from > self.date_to:
+            raise ValueError("date_from must be on or before date_to")
+        return self
+
+    def params(self) -> dict[str, str]:
+        names = {"date_from": "from", "date_to": "to"}
+        return {
+            names.get(k, k): str(v)
+            for k, v in self.model_dump(mode="json", exclude_none=True).items()
+        }
+
+
+class SpendingPeriod(_Response):
+    from_: Date = Field(alias="from")
+    to: Date
+
+
+class SpendingCategory(_Response):
+    category: str
+    count: int
+    total_usd: Decimal
+    share_pct: Decimal | None = None
+    monthly_average_usd: Decimal
+
+
+class SpendingMonth(_Response):
+    month: str
+    total_usd: Decimal
+    change_pct: Decimal | None = None  # vs the previous month; None after a zero month
+
+
+class SpendingProductMonth(_Response):
+    month: str
+    total_usd: Decimal
+
+
+class SpendingProduct(_Response):
+    product_id: str | None = None
+    product_type: str | None = None
+    product_number: str | None = None  # cards masked by Node
+    total_usd: Decimal
+    share_pct: Decimal | None = None
+    by_month: list[SpendingProductMonth]
+
+
+class Spending(_Response):
+    """`GET /reports/spending`: approved outflows (purchases, withdrawals, transfers, payments) in
+    USD. `product_id` filters totals, categories and months; `by_product` always has every
+    product, so cards can be compared."""
+
+    period: SpendingPeriod
+    product_id: str | None = None
+    total_spent_usd: Decimal
+    monthly_average_usd: Decimal
+    by_category: list[SpendingCategory]
+    by_month: list[SpendingMonth]
+    by_product: list[SpendingProduct]
+
+
 def aware(value: datetime) -> datetime:
     """Node's timestamps are UTC; the fixture's are naive UTC."""
     return value if value.tzinfo else value.replace(tzinfo=UTC)

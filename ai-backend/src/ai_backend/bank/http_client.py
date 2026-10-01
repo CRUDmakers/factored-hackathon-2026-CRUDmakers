@@ -38,6 +38,8 @@ from ai_backend.bank.models import (
     PaymentResult,
     ProductDetail,
     RecurringPayments,
+    Spending,
+    SpendingQuery,
     TransactionDetailPolicyView,
     TransactionPage,
     TransactionQuery,
@@ -121,6 +123,12 @@ class HttpBankClient:
             "GET", _customer(s, "recurring-payments"), token=_token(s), params=params
         )
         return _parse(RecurringPayments, data)
+
+    async def get_spending(self, s: Session, q: SpendingQuery) -> Spending:
+        data = await self._request(
+            "GET", _customer(s, "reports/spending"), token=_token(s), params=q.params()
+        )
+        return _parse(Spending, data)
 
     async def preview_payment(self, s: Session, req: PaymentRequest) -> PaymentResult:
         data = await self._request(

@@ -46,11 +46,17 @@ from ai_backend.bank.models import (
     PixDestination,
     ProductDetail,
     RecurringPayments,
+    Spending,
+    SpendingQuery,
     TransactionDetailPolicyView,
     TransactionPage,
     TransactionQuery,
     TransferDestination,
 )
+
+# backend/src/services/transactions.ts: what counts as spending, and the default period.
+OUTFLOW_TYPES = ("Purchase", "Withdrawal", "Transfer", "Payment")
+SPENDING_MONTHS = 3
 
 # backend/src/services/recurring.ts: how many months before the reference month are searched.
 RECURRING_MONTHS_BACK = 12
@@ -430,6 +436,86 @@ class FakeBankClient:
                     "due": sum(i["status"] == "due" for i in items),
                     "due_totals": [{"currency": c, "amount": a} for c, a in totals.items()],
                 },
+            }
+        )
+
+    async def get_spending(self, s: Session, q: SpendingQuery) -> Spending:
+        """backend/src/services/transactions.ts getSpending."""
+        customer_id = await self._authorise(s)
+        own = [t for t in self._fx.transactions.values() if t.customer_id == customer_id]
+        end = q.date_to or (max(t.transaction_date for t in own).date() if own else self._today())
+        start = q.date_from or _same_day_in(
+            _month_index(end) - ((q.months or SPENDING_MONTHS) - 1), 1
+        )
+        months = [_month_label(i) for i in range(_month_index(start), _month_index(end) + 1)]
+        spent = [
+            (t, self._item_usd(t) or Decimal(0))
+            for t in own
+            if start <= t.transaction_date.date() <= end
+            and t.status == "Approved"
+            and t.transaction_type in OUTFLOW_TYPES
+        ]
+
+        def month_of(t: FixtureTransaction) -> str:
+            return t.transaction_date.strftime("%Y-%m")
+
+        def per_month(rows: list[tuple[FixtureTransaction, Decimal]]) -> list[Decimal]:
+            return [
+                _round2(sum((u for t, u in rows if month_of(t) == m), Decimal(0))) for m in months
+            ]
+
+        def share(part: Decimal, whole: Decimal) -> Decimal | None:
+            return _round2(part / whole * 100) if whole else None
+
+        mine = [r for r in spent if q.product_id is None or r[0].product_id == q.product_id]
+        total = sum((u for _, u in mine), Decimal(0))
+        all_total = sum((u for _, u in spent), Decimal(0))
+        categories = []
+        for category in {_category(t) for t, _ in mine}:
+            rows = [u for t, u in mine if _category(t) == category]
+            categories.append(
+                {
+                    "category": category,
+                    "count": len(rows),
+                    "total_usd": _round2(sum(rows, Decimal(0))),
+                    "share_pct": share(sum(rows, Decimal(0)), total),
+                    "monthly_average_usd": _round2(sum(rows, Decimal(0)) / len(months)),
+                }
+            )
+        totals = per_month(mine)
+        products = []
+        for product_id in {t.product_id for t, _ in spent}:
+            rows = [r for r in spent if r[0].product_id == product_id]
+            p = self._fx.products.get(product_id) if product_id else None
+            products.append(
+                {
+                    "product_id": product_id,
+                    "product_type": p.product_type if p else None,
+                    "product_number": _display_number(p) if p else None,
+                    "total_usd": _round2(sum((u for _, u in rows), Decimal(0))),
+                    "share_pct": share(sum((u for _, u in rows), Decimal(0)), all_total),
+                    "by_month": [
+                        {"month": m, "total_usd": v}
+                        for m, v in zip(months, per_month(rows), strict=True)
+                    ],
+                }
+            )
+        return Spending.model_validate(
+            {
+                "period": {"from": start, "to": end},
+                "product_id": q.product_id,
+                "total_spent_usd": _round2(total),
+                "monthly_average_usd": _round2(total / len(months)),
+                "by_category": sorted(categories, key=lambda c: (-c["total_usd"], c["category"])),
+                "by_month": [
+                    {
+                        "month": m,
+                        "total_usd": v,
+                        "change_pct": share(v - totals[i - 1], totals[i - 1]) if i else None,
+                    }
+                    for i, (m, v) in enumerate(zip(months, totals, strict=True))
+                ],
+                "by_product": sorted(products, key=lambda p: -p["total_usd"]),
             }
         )
 

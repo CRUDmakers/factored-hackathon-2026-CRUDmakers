@@ -28,6 +28,7 @@ def test_every_p0_tool_is_registered():
         "convert_currency": "read", "transfer_money": "write", "pay_bill": "write",
         "handoff_to_human": "escalate", "generate_files": "read",
         "get_recurring_payments": "read", "pay_recurring_payments": "write",
+        "get_spending_summary": "read",
     }
 
 
@@ -133,6 +134,66 @@ async def test_response_codes_only_for_declined(ctx, bank, session_b):
 async def test_invalid_arguments_become_an_error_result(ctx, args):
     r = await run(ctx, "search_transactions", **args)
     assert not r.ok and r.error_code == "invalid_arguments"
+
+
+async def test_search_by_card(ctx):
+    r = await run(ctx, "search_transactions", product_id="PRD-ACHK", limit=20)
+    assert r.ok and r.data["transactions"]
+    assert {t["product_id"] for t in r.data["transactions"]} == {"PRD-ACHK"}
+
+
+# ---------- get_spending_summary ----------
+
+
+async def test_spending_summary_by_month_category_and_card(ctx):
+    r = await run(ctx, "get_spending_summary")
+    assert r.ok
+    # Default: 3 whole calendar months up to the latest transaction (2026-06-17).
+    assert r.data["period"] == {"from": "2026-04-01", "to": "2026-06-17"}
+    assert [m["month"] for m in r.data["by_month"]] == ["2026-04", "2026-05", "2026-06"]
+    assert r.data["total_spent_usd"] == "1238.30"
+    top = r.data["by_category"][0]
+    assert top == {
+        "category": "Entertainment",
+        "count": 1,
+        "total_usd": "912.40",
+        "share_pct": "73.68",
+        "monthly_average_usd": "304.13",
+    }
+    cards = {p["product"]: p["total_usd"] for p in r.data["by_product"]}
+    assert cards == {"Tarjeta Crédito •••• 4321": "958.30", "Cuenta Corriente •••• 2233": "280.00"}
+    assert "1111222233" not in str(r.data)  # numbers stay masked
+    assert any("Entertainment: 912.40 USD" in f.fact for f in r.facts)
+
+
+async def test_spending_summary_for_one_card(ctx):
+    r = await run(ctx, "get_spending_summary", months=1, product_id="PRD-ACC")
+    assert r.data["scope"] == "Tarjeta Crédito •••• 4321"
+    assert r.data["total_spent_usd"] == "958.30"
+    assert {c["category"] for c in r.data["by_category"]} == {"Entertainment", "Food"}
+    assert len(r.data["by_product"]) == 2  # every card stays listed, to compare
+
+
+async def test_spending_summary_month_over_month_change(bank, session_b):
+    ctx = d.ToolContext(bank=bank, session=session_b, today=NOW.date())
+    r = await run(ctx, "get_spending_summary", date_from="2026-05-01", date_to="2026-06-30")
+    may, june = r.data["by_month"]
+    assert may["total_usd"] == "0.00" and may["change_pct_vs_previous"] is None
+    assert june["change_pct_vs_previous"] is None  # after a zero month there's no percentage
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        {"months": 0},
+        {"months": 13},
+        {"product_id": "ACC-1"},
+        {"date_from": "2026-06-10", "date_to": "2026-06-01"},
+    ],
+)
+async def test_spending_summary_rejects_bad_arguments(ctx, args):
+    r = await run(ctx, "get_spending_summary", **args)
+    assert not r.ok
 
 
 # ---------- get_transaction ----------
