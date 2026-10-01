@@ -1,51 +1,53 @@
+# Variante de desenvolvimento (frontend com hot reload). Mesmo .env da raiz.
+# docker compose -f docker-compose.dev.yml up -d --build
 services:
   db:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: banking
-      POSTGRES_PASSWORD: banking
+      POSTGRES_USER: ${POSTGRES_USER:-banking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banking}
       POSTGRES_DB: banking
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U banking -d banking"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-banking} -d banking"]
       interval: 5s
       timeout: 5s
       retries: 20
 
-  # Aplica as migrações e sobe a API (Swagger em http://localhost:3000/docs).
-  # A imagem roda com NODE_ENV=production: sem AUTH_JWT_SECRET e AUTH_SERVICE_KEY ela não sobe.
-  # Os valores abaixo são só para a demo local; sobrescreva via ambiente ou arquivo .env na raiz.
-  api:
-    build: ./backend
-    environment:
-      DATABASE_URL: postgresql://banking:banking@db:5432/banking
-      PORT: 3000
-      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-demo-jwt-secret-troque-fora-da-demo-local}
-      AUTH_SERVICE_KEY: ${AUTH_SERVICE_KEY:-demo-service-key}
-      AUTH_SESSION_TTL_SECONDS: ${AUTH_SESSION_TTL_SECONDS:-900}
-    ports:
-      - "3000:3000"
-    depends_on:
-      db:
-        condition: service_healthy
-
-  # Carga dos CSVs de ./data (rodar uma vez): docker compose run --rm etl
+  # Aplica as migrações e carrega os CSVs de ./data. Idempotente: se os dados já estão no banco,
+  # só confere e sai. Para recarregar: docker compose run --rm etl sh -c "node dist/etl/cli.js --force"
   etl:
     build: ./backend
     command: ["sh", "-c", "npx prisma migrate deploy && node dist/etl/cli.js"]
     environment:
-      DATABASE_URL: postgresql://banking:banking@db:5432/banking
+      DATABASE_URL: postgresql://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-banking}@db:5432/banking
       DATA_DIR: /data
     volumes:
       - ./data:/data:ro
     depends_on:
       db:
         condition: service_healthy
-    profiles: ["etl"]
+
+  # API do banco (Swagger em http://localhost:${API_PORT}/docs).
+  # Roda com NODE_ENV=production: sem AUTH_JWT_SECRET e AUTH_SERVICE_KEY ela não sobe.
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-banking}@db:5432/banking
+      PORT: 3000
+      AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?defina AUTH_JWT_SECRET no .env}
+      AUTH_SERVICE_KEY: ${AUTH_SERVICE_KEY:?defina AUTH_SERVICE_KEY no .env}
+      AUTH_SESSION_TTL_SECONDS: ${AUTH_SESSION_TTL_SECONDS:-900}
+      LOG_LEVEL: ${API_LOG_LEVEL:-info}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      etl:
+        condition: service_completed_successfully
 
   # Testes com cobertura contra o banco banking_test: docker compose run --rm test
   test:
@@ -54,51 +56,52 @@ services:
       target: build
     command: ["npm", "run", "test:coverage"]
     environment:
-      TEST_DATABASE_URL: postgresql://banking:banking@db:5432/banking_test
+      TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-banking}@db:5432/banking_test
     depends_on:
       db:
         condition: service_healthy
     profiles: ["test"]
 
-  # Internet banking de demonstração (Vite + React servido por nginx): http://localhost:5173
-  # No dev o Vite lê as VITE_* do ambiente do container (não de build args) e as usa no NAVEGADOR (por isso localhost).
+  # Internet banking de demonstração (Vite dev server com hot reload): http://localhost:${FRONTEND_PORT}
+  # No dev o Vite lê as VITE_* do ambiente do container e as usa no NAVEGADOR (por isso localhost:<porta do host>).
   frontend:
     image: frontend:dev
     build:
       context: ./frontend
       dockerfile: Dockerfile.dev
     environment:
-      VITE_API_URL: ${FRONTEND_API_URL:-http://localhost:3000}
-      VITE_SERVICE_KEY: ${FRONTEND_SERVICE_KEY:-${AUTH_SERVICE_KEY:-demo-service-key}}
-      VITE_AI_URL: ${FRONTEND_AI_URL:-http://localhost:8000}
+      VITE_API_URL: http://localhost:${API_PORT:-3000}
+      VITE_SERVICE_KEY: ${AUTH_SERVICE_KEY:?defina AUTH_SERVICE_KEY no .env}
+      VITE_AI_URL: http://localhost:${AI_PORT:-8000}
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
       - api
       - ai-backend
     volumes:
       - ./frontend:/app
 
-  # Assistente de IA (Backend 2): http://localhost:8000/v1/health · contrato do chat em ai-backend/CHAT_API.md
+  # Assistente de IA (Backend 2): http://localhost:${AI_PORT}/v1/health · contrato do chat em ai-backend/CHAT_API.md
   # - Cria o próprio banco `ai_backend` neste Postgres ao subir (conversas, checkpoints, traces, handoffs).
   # - Não guarda o segredo JWT nem a chave de serviço: valida cada sessão na API (GET /auth/sessions/current).
-  # - O modelo vem de ai-backend/.env (opcional; veja ai-backend/.env.example).
   ai-backend:
     build: ./ai-backend
-    env_file:
-      - path: ./ai-backend/.env
-        required: false
     environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_COMPAT_BASE_URL: ${OPENAI_COMPAT_BASE_URL:-}
+      OPENAI_COMPAT_API_KEY: ${OPENAI_COMPAT_API_KEY:-}
+      AGENT_MODEL: ${AGENT_MODEL:-gemini-3.8-flash}
+      JUDGE_MODEL: ${JUDGE_MODEL:-gemini-3.1-pro-low}
       BANK_MODE: http
       BANK_BASE_URL: http://api:3000
-      DB_URL: postgresql://banking:banking@db:5432/ai_backend
-      CORS_ORIGINS: ${AI_CORS_ORIGINS:-http://localhost:5173}
-      # Desenvolvimento: o 9router roda no host; de dentro do container ele é host.docker.internal.
-      OPENAI_COMPAT_BASE_URL: ${AI_OPENAI_COMPAT_BASE_URL:-http://host.docker.internal:20128/v1}
+      DB_URL: postgresql://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-banking}@db:5432/ai_backend
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-5173}
+      TRACE_RETENTION_DAYS: ${TRACE_RETENTION_DAYS:-30}
+      LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8000:8000"
+      - "${AI_PORT:-8000}:8000"
     depends_on:
       db:
         condition: service_healthy
