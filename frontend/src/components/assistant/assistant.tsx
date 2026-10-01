@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
     BookOpen,
     Headset,
@@ -449,7 +451,7 @@ function Message({ bubble }: { bubble: Bubble }) {
             <div className="flex min-w-0 flex-col gap-2">
                 <div
                     className={cn(
-                        "rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm whitespace-pre-wrap shadow-sm",
+                        "min-w-0 rounded-2xl rounded-bl-md px-3.5 py-2.5 text-sm shadow-sm",
                         bubble.from === "error"
                             ? "bg-destructive/10 text-destructive"
                             : confirm
@@ -481,9 +483,45 @@ function Message({ bubble }: { bubble: Bubble }) {
     );
 }
 
-/** ponytail: only **bold** is rendered; add a markdown lib if replies grow links or tables. */
+/** Agent replies are Markdown (GFM: tables, lists, headings). Raw HTML is not rendered. */
+type Tag = keyof React.JSX.IntrinsicElements;
+/** A markdown element rendered as `tag` with Tailwind classes (drops react-markdown's `node` prop). */
+const md =
+    (tag: Tag, className: string, extra?: object) =>
+    ({ node: _node, ...props }: ExtraProps & React.HTMLAttributes<HTMLElement>) => {
+        const El = tag as React.ElementType;
+        return <El className={className} {...extra} {...props} />;
+    };
+
+const markdown: Components = {
+    p: md("p", "my-1.5 first:mt-0 last:mb-0"),
+    h1: md("h3", "mt-3 mb-1.5 text-base font-semibold first:mt-0"),
+    h2: md("h3", "mt-3 mb-1.5 text-base font-semibold first:mt-0"),
+    h3: md("h4", "mt-3 mb-1 font-semibold first:mt-0"),
+    h4: md("h4", "mt-2 mb-1 font-semibold first:mt-0"),
+    ul: md("ul", "my-1.5 list-disc space-y-0.5 ps-5"),
+    ol: md("ol", "my-1.5 list-decimal space-y-0.5 ps-5"),
+    hr: md("hr", "border-border my-2.5"),
+    a: md("a", "text-primary underline", { target: "_blank", rel: "noreferrer" }),
+    code: md("code", "bg-muted rounded px-1 py-0.5 font-mono text-xs"),
+    blockquote: md("blockquote", "text-muted-foreground my-1.5 border-s-2 ps-3"),
+    table: ({ node: _node, ...props }) => (
+        <div className="my-2 overflow-x-auto rounded-lg border">
+            <table className="w-full text-xs" {...props} />
+        </div>
+    ),
+    thead: md("thead", "bg-muted/60"),
+    tr: md("tr", "border-b last:border-0"),
+    th: md("th", "px-2 py-1.5 text-start font-semibold whitespace-nowrap"),
+    td: md("td", "px-2 py-1.5 whitespace-nowrap"),
+};
+
 function Rich({ text }: { text: string }) {
-    return <>{text.split(/\*\*(.+?)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part))}</>;
+    return (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdown}>
+            {text}
+        </ReactMarkdown>
+    );
 }
 
 function Typing({ label }: { label: string }) {
