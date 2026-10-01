@@ -1,5 +1,5 @@
 import { Prisma, prisma, type Decimal } from '../db/prisma.js';
-import { LOAN_PRODUCTS, PRODUCT_TYPES, isoDay } from '../lib/domain.js';
+import { LOAN_PRODUCTS, PRODUCT_TYPES, displayNumber, isoDay } from '../lib/domain.js';
 import { notFound } from '../lib/errors.js';
 import { explainStatus } from '../lib/responseCodes.js';
 import { assertCustomer } from './customers.js';
@@ -319,7 +319,7 @@ export async function getSpending(
     return {
       product_id: productId,
       product_type: prod[0].product_type,
-      product_number: prod[0].product_number,
+      product_number: displayNumber(prod[0].product_type ?? '', prod[0].product_number),
       total_usd: round(sum),
       share_pct: round((sum / allTotal) * 100),
       by_month: months.map((month, i) => ({ month, total_usd: totals[i] })),

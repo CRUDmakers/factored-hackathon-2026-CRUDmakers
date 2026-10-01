@@ -172,6 +172,10 @@ describe('gastos por categoria (feature 7)', () => {
     expect(one.total_spent_usd).toBe(card.total_usd);
     expect(one.by_category.map((c: { category: string }) => c.category)).toContain('Food');
     expect(one.by_product).toEqual(all.by_product);
+    // Card numbers are masked, as everywhere else in the API.
+    for (const p of all.by_product) {
+      if (p.product_type?.startsWith('Tarjeta')) expect(p.product_number).toMatch(/^•••• \d{4}$/);
+    }
   });
 
   it('período sem gastos', async () => {
