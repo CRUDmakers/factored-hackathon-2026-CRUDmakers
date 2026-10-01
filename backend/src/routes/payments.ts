@@ -1,6 +1,7 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { BillPaymentBody, CustomerParams, DryRunQuery, PixBody, TransferBody } from '../schemas.js';
+import { BillPaymentBody, CustomerParams, DryRunQuery, PixBody, RecurringQuery, TransferBody } from '../schemas.js';
 import { executePayment, previewPayment, type Destination, type PaymentMethod } from '../services/payments.js';
+import { getRecurringPayments } from '../services/recurring.js';
 
 interface CommonBody {
   source_product_id: string;
@@ -58,5 +59,20 @@ export const paymentRoutes: FastifyPluginAsyncTypebox = async (app) => {
     },
     handler: async (req, reply) =>
       reply.code(req.query.dry_run ? 200 : 201).send(await run(req.params.customerId, 'bill_payment', req.body, req.query.dry_run)),
+  });
+
+  app.get('/customers/:customerId/recurring-payments', {
+    schema: {
+      tags: ['Operações'],
+      summary: 'Pagamentos recorrentes mensais: o que já foi pago no mês e o que falta pagar',
+      description:
+        'Recorrente = transferência, Pix ou boleto feito pela API para o mesmo destino, com o mesmo valor e moeda, em pelo ' +
+        'menos 2 meses seguidos, e pago no mês de referência ou no anterior. `status`: paid (já pago no mês), scheduled ' +
+        '(um agendamento ativo vai pagar) ou due (falta pagar). `due_date` é a data prevista no mês de referência. `payment` traz method, origem, valor e destination prontos ' +
+        'para pagar de novo pelo endpoint do método.',
+      params: CustomerParams,
+      querystring: RecurringQuery,
+    },
+    handler: (req) => getRecurringPayments(req.params.customerId, req.query),
   });
 };

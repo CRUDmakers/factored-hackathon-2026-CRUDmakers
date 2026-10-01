@@ -3,6 +3,7 @@
     START → intake ─(pending + yes)→ mark_executing → execute_write → verify → respond
               │                                         └(unknown)→ reconcile ─┘
               ├─(pending + no / expired)→ respond         (unknown/mismatch)→ handoff
+              │   a batch of payments loops verify → mark_executing until its queue is empty
               └→ preprocess → agent → policy_gate ─(reads)→ tools → escalation_check → agent
                                         ├(payment)→ prepare_write → respond (confirm?)
                                         └(escalate)→ handoff → respond → END
@@ -28,9 +29,9 @@ EDGES: dict[str, list[str]] = {
     "escalation_check": ["agent", "handoff"],
     "prepare_write": ["agent", "handoff", "respond"],
     "mark_executing": ["execute_write"],
-    "execute_write": ["verify", "reconcile", "respond"],
+    "execute_write": ["verify", "reconcile", "mark_executing", "respond"],
     "reconcile": ["verify", "handoff"],
-    "verify": ["handoff", "respond"],
+    "verify": ["handoff", "mark_executing", "respond"],
     "handoff": ["respond"],
 }
 

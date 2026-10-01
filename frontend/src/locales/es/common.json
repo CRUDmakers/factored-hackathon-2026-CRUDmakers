@@ -66,6 +66,10 @@
         "cancel": "Cancelar",
         "handoffTitle": "Derivado a un agente",
         "handoffRef": "Referencia: {{id}}",
+        "download": "Descargar {{name}}",
+        "fileRows_one": "{{count}} fila",
+        "fileRows_other": "{{count}} filas",
+        "fileError": "No se pudo descargar el archivo. Puede haber expirado: pida al asistente que lo genere de nuevo.",
         "error": "La conversación expiró. Envíe su mensaje nuevamente.",
         "prompts": {
             "balances": {

@@ -115,7 +115,7 @@ def test_pt_payment_status_is_answered_from_the_bank():
         assert tool["tool"] == "search_transactions" and tool["outcome"] == "ok"
         assert tool["args_redacted"]["merchant"] == "Uber"
         agent = next(e for e in events if e["node"] == "agent")
-        assert agent["tokens_in"] == 100 and agent["prompt_version"] == "system_v4"
+        assert agent["tokens_in"] == 100 and agent["prompt_version"] == "system_v5"
         assert {e["trace_id"] for e in events} == {body["trace_id"]}
 
         # Verified facts are kept for the handoff (M2).

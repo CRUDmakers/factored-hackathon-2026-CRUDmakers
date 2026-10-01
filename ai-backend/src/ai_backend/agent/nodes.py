@@ -49,8 +49,9 @@ from ai_backend.tools.payments import (
     result_message,
     to_payment_request,
 )
+from ai_backend.tools.recurring import batch_confirmation_summary, batch_result_message
 
-PROMPT_VERSION = "system_v4"
+PROMPT_VERSION = "system_v5"
 ROUTING_NOTES = {
     "possible_human": (
         "\n## Routing note\nA triage model thinks this message may need a human agent (fraud, "
@@ -105,18 +106,18 @@ async def intake(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str,
         if decision == "wrong_action":
             return _reply(text.message("no_pending", language))
         if _expired(pending, ctx.clock()):
-            record = _action(pending, "expired")
+            records = _close(pending, "expired")
             if decision == "other":
-                return {**closed, "actions": [record], "next_step": "preprocess"}
-            return {**closed, "actions": [record], **_reply(text.message("expired", language))}
+                return {**closed, "actions": records, "next_step": "preprocess"}
+            return {**closed, "actions": records, **_reply(text.message("expired", language))}
         if decision == "approve":
             # Executed before but no result recorded (e.g. a crash): look for it, never re-send.
             return {"next_step": "reconcile" if pending.get("executed") else "mark_executing"}
         if decision == "reject":
-            record = _action(pending, "rejected")
-            return {**closed, "actions": [record], **_reply(text.message("cancelled", language))}
+            records = _close(pending, "rejected")
+            return {**closed, "actions": records, **_reply(text.message("cancelled", language))}
         # Anything else: the customer moved on; the payment is dropped, never executed.
-        return {**closed, "actions": [_action(pending, "cancelled")], "next_step": "preprocess"}
+        return {**closed, "actions": _close(pending, "cancelled"), "next_step": "preprocess"}
 
 
 def _decision(confirmation: dict[str, str] | None, message: str, action_id: str) -> str:
@@ -151,6 +152,36 @@ def _action(pending: dict[str, Any], status: str, **extra: Any) -> dict[str, Any
         "transaction_id": None,
         **extra,
     }
+
+
+def _queued(pending: dict[str, Any], status: str) -> list[dict[str, Any]]:
+    """Records for the payments of a batch that are still waiting their turn."""
+    return [_action({**pending, **item}, status) for item in pending.get("queue") or []]
+
+
+def _close(pending: dict[str, Any], status: str) -> list[dict[str, Any]]:
+    return [_action(pending, status), *_queued(pending, status)]
+
+
+def _next_or_finish(
+    pending: dict[str, Any], record: dict[str, Any], line: str, language: str
+) -> dict[str, Any]:
+    """After one payment: run the next one of a batch, or reply with every result."""
+    queue = pending.get("queue") or []
+    lines = [*(pending.get("results") or []), line]
+    if queue:
+        following, *rest = queue
+        advanced = {
+            **pending,
+            **following,
+            "queue": rest,
+            "results": lines,
+            "executed": False,
+            "transaction_id": None,
+        }
+        return {"pending_action": advanced, "actions": [record], "next_step": "mark_executing"}
+    reply = batch_result_message(lines, language) if pending.get("batch") else line  # type: ignore[arg-type]
+    return {"pending_action": None, "actions": [record], **_reply(reply)}
 
 
 # ---------- preprocess ----------
@@ -374,13 +405,21 @@ async def run_tools(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
     # The gate may have answered denied calls already, so look for the model's message.
     calls = [c for c in _last_ai(state).tool_calls if c["id"] in allowed]
 
-    tool_ctx = ToolContext(bank=ctx.bank, session=ctx.session, today=ctx.today)
+    tool_ctx = ToolContext(
+        bank=ctx.bank,
+        session=ctx.session,
+        today=ctx.today,
+        files=ctx.files,
+        conversation_id=ctx.tracer.conversation_id,
+        file_ttl=ctx.file_ttl,
+    )
     results = await asyncio.gather(*(_run_one(ctx, tool_ctx, call) for call in calls))
 
     update: dict[str, Any] = {
         "messages": [],
         "verified_facts": [],
         "step_policy_facts": [],
+        "files": list(state.get("files") or []),
         "tool_steps": state.get("tool_steps", 0) + 1,
         "next_step": "escalation_check",
     }
@@ -399,6 +438,7 @@ async def run_tools(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         )
         update["verified_facts"] += _facts(result, ctx)
         update["step_policy_facts"] += result.policy_facts
+        update["files"] += result.files
     return update
 
 
@@ -452,6 +492,8 @@ async def prepare_write(state: AgentState, runtime: Runtime[AgentContext]) -> di
         if ctx.tools.get(c["name"]) is not None and ctx.tools[c["name"]].kind == "write"
     )
     steps = state.get("tool_steps", 0) + 1
+    if call["name"] == "pay_recurring_payments":
+        return await _prepare_batch(ctx, call, steps, language)
 
     def back_to_agent(result: ToolResult, **extra: Any) -> dict[str, Any]:
         message = ToolMessage(
@@ -564,6 +606,176 @@ async def prepare_write(state: AgentState, runtime: Runtime[AgentContext]) -> di
     }
 
 
+async def _prepare_batch(
+    ctx: AgentContext, call: dict[str, Any], steps: int, language: str
+) -> dict[str, Any]:
+    """pay_recurring_payments: preview every payment, then one confirmation for all of them.
+    The requests come from Node's recurring list, never from the model's arguments."""
+
+    def back_to_agent(result: ToolResult, **extra: Any) -> dict[str, Any]:
+        message = ToolMessage(
+            _frame(call["name"], result), tool_call_id=call["id"], name=call["name"]
+        )
+        return {"messages": [message], "tool_steps": steps, "next_step": "agent", **extra}
+
+    def escalate(decision: PolicyDecision) -> dict[str, Any]:
+        return {
+            **_answer_all([call], "handed_to_human"),
+            "policy_decisions": [
+                {"tool": call["name"], "decision": "escalate", "reason_code": _code(decision)}
+            ],
+            "escalation": [_code(decision)],
+            "tool_steps": steps,
+            "next_step": "handoff",
+        }
+
+    with ctx.tracer.span(
+        "prepare_write", tool=call["name"], args_redacted=redact(call["args"])
+    ) as event:
+        args = ctx.tools[call["name"]].parse(call.get("args") or {})
+        if isinstance(args, ToolResult):
+            event["outcome"] = "invalid_arguments"
+            return back_to_agent(args)
+        try:
+            recurring = await ctx.bank.get_recurring_payments(ctx.session, ctx.today)
+        except AuthExpired:
+            event["outcome"] = "login_required"
+            return {**_answer_all([call], "session_expired"), **_login_required()}
+        except BankError:
+            decision = engine.bank_failure("get_recurring_payments")
+            event.update(outcome="error:bank_unavailable", reason_code=_code(decision))
+            return escalate(decision)
+
+        by_id = {i.recurring_id: i for i in recurring.items}
+        ids = list(dict.fromkeys(args.recurring_ids))  # type: ignore[attr-defined]
+        unknown = [i for i in ids if i not in by_id]
+        if unknown:
+            event["outcome"] = "error:not_found"
+            return back_to_agent(
+                ToolResult.error(
+                    "not_found",
+                    f"Unknown recurring_ids: {', '.join(unknown)}. Use the ids from "
+                    "get_recurring_payments.",
+                )
+            )
+        not_due = [f"{i} ({by_id[i].status})" for i in ids if by_id[i].status != "due"]
+        if not_due:
+            event["outcome"] = "error:not_due"
+            return back_to_agent(
+                ToolResult.error(
+                    "not_due",
+                    "Already paid this month or covered by a scheduled payment: "
+                    + ", ".join(not_due),
+                )
+            )
+
+        previews: list[tuple[PaymentRequest, PaymentResult]] = []
+        total_usd = Decimal(0)
+        for recurring_id in ids:
+            request = by_id[recurring_id].payment
+            rejection: BankRejected | None = None
+            preview: PaymentResult | None = None
+            try:
+                preview = await ctx.bank.preview_payment(ctx.session, request)
+            except BankRejected as exc:
+                rejection = exc
+            except NotFound:
+                event["outcome"] = "error:not_found"
+                return back_to_agent(
+                    ToolResult.error("not_found", f"{recurring_id}: the source account is gone.")
+                )
+            except AuthExpired:
+                event["outcome"] = "login_required"
+                return {**_answer_all([call], "session_expired"), **_login_required()}
+            except (BankUnavailable, BankContractError):
+                decision = engine.bank_failure("preview_payment")
+                event.update(outcome="error:bank_unavailable", reason_code=_code(decision))
+                return escalate(decision)
+
+            amount_usd = await _amount_usd(ctx, preview) if preview else None
+            decision = engine.check_preview(
+                rejection_code=rejection.code if rejection else None,
+                status=preview.status if preview else None,
+                response_code=preview.response_code if preview else None,
+                amount_usd=amount_usd,
+                config=ctx.policy,
+            )
+            event.update(policy_decision=decision.decision, reason_code=_code(decision))
+            if decision.decision == "escalate":
+                return escalate(decision)
+            if decision.decision == "deny":
+                detail = (rejection.message if rejection else None) or (
+                    preview.decline_detail if preview else None
+                )
+                record = [
+                    {"tool": call["name"], "decision": "deny", "reason_code": _code(decision)}
+                ]
+                return back_to_agent(
+                    ToolResult.error(
+                        _code(decision) or "denied",
+                        f"{recurring_id}: {detail or 'The bank would decline it.'} "
+                        "Nothing was paid; you may offer to pay the others.",
+                    ),
+                    policy_decisions=record,
+                )
+            assert preview is not None and amount_usd is not None
+            previews.append((request, preview))
+            total_usd += amount_usd
+
+        decision = engine.check_batch_total(total_usd, ctx.policy)
+        event.update(policy_decision=decision.decision, reason_code=_code(decision))
+        if decision.decision == "escalate":
+            return escalate(decision)
+
+        labels = [await _source_label(ctx, p, language) for _, p in previews]
+        summary = batch_confirmation_summary(
+            [p for _, p in previews],
+            labels,
+            language,  # type: ignore[arg-type]
+        )
+        now = ctx.clock()
+        action_id = f"act_{uuid.uuid4().hex[:12]}"
+        items = [
+            {
+                "tool": call["name"],
+                "method": request.method,
+                "request": request.model_dump(mode="json"),
+                "preview": preview.model_dump(mode="json", by_alias=True),
+                "idempotency_key": f"{action_id}-{n}-{uuid.uuid4().hex[:8]}",
+            }
+            for n, (request, preview) in enumerate(previews)
+        ]
+        first, *rest = items
+        pending = {
+            "action_id": action_id,
+            **first,
+            "summary": summary,
+            "created_at": now.isoformat(),
+            "expires_at": (
+                now + timedelta(seconds=ctx.policy.limits.confirmation_ttl_seconds)
+            ).isoformat(),
+            "executed": False,
+            "batch": True,
+            "queue": rest,
+            "results": [],
+        }
+        event["outcome"] = "awaiting_confirmation"
+    waiting = ToolResult(ok=True, data={"status": "awaiting_confirmation", "summary": summary})
+    return {
+        "messages": [
+            ToolMessage(_frame(call["name"], waiting), tool_call_id=call["id"], name=call["name"])
+        ],
+        "policy_decisions": [
+            {"tool": call["name"], "decision": "confirm", "reason_code": _code(decision)}
+        ],
+        "pending_action": pending,
+        "tool_steps": steps,
+        "status": "awaiting_confirmation",
+        "outcome": "awaiting_confirmation",
+        **_reply(summary),
+    }
+
+
 async def _amount_usd(ctx: AgentContext, preview: PaymentResult) -> Decimal | None:
     if preview.currency == "USD":
         return preview.amount
@@ -606,11 +818,12 @@ async def execute_write(state: AgentState, runtime: Runtime[AgentContext]) -> di
             return {"pending_action": {**pending, "executed": False}, **_login_required()}
         except (BankRejected, NotFound):
             event["outcome"] = "rejected_by_bank"
-            return {
-                "pending_action": None,
-                "actions": [_action(pending, "rejected_by_bank")],
-                **_reply(text.message("bank_refused_execution", language)),
-            }
+            return _next_or_finish(
+                pending,
+                _action(pending, "rejected_by_bank"),
+                text.message("bank_refused_execution", language),
+                language,
+            )
         except (BankUnavailable, BankContractError) as exc:
             event.update(outcome="unknown", error=type(exc).__name__)
             return {"next_step": "reconcile"}
@@ -657,7 +870,7 @@ async def reconcile(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
             event.update(outcome="not_found", reason_code=ReasonCode.OUTCOME_UNKNOWN)
             return {
                 "pending_action": None,
-                "actions": [_action(pending, "unknown")],
+                "actions": [_action(pending, "unknown"), *_queued(pending, "cancelled")],
                 "escalation": [ReasonCode.OUTCOME_UNKNOWN.value],
                 "next_step": "handoff",
             }
@@ -707,7 +920,10 @@ async def verify(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str,
         if decision.decision == "escalate" or readback is None:
             return {
                 **closed,
-                "actions": [_action(pending, "unverified", transaction_id=transaction_id)],
+                "actions": [
+                    _action(pending, "unverified", transaction_id=transaction_id),
+                    *_queued(pending, "cancelled"),
+                ],
                 "escalation": [ReasonCode.VERIFY_MISMATCH.value],
                 "next_step": "handoff",
             }
@@ -720,14 +936,9 @@ async def verify(state: AgentState, runtime: Runtime[AgentContext]) -> dict[str,
         "record_id": readback.transaction_id,
         "as_of": ctx.today.isoformat(),
     }
-    return {
-        **closed,
-        "actions": [
-            _action(pending, status, verified=True, transaction_id=readback.transaction_id)
-        ],
-        "verified_facts": [fact],
-        **_reply(result_message(preview, readback, language)),  # type: ignore[arg-type]
-    }
+    record = _action(pending, status, verified=True, transaction_id=readback.transaction_id)
+    line = result_message(preview, readback, language)  # type: ignore[arg-type]
+    return {"verified_facts": [fact], **_next_or_finish(pending, record, line, language)}
 
 
 # ---------- handoff ----------

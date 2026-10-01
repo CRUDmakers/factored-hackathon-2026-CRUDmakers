@@ -45,6 +45,13 @@ def check_preview(
     )
 
 
+def check_batch_total(amount_usd: Decimal | None, config: PolicyConfig) -> PolicyDecision:
+    """Several payments confirmed together: their sum must also be within the amount limit."""
+    return rules.amount_within_limit(amount_usd, config) or PolicyDecision(
+        "confirm", ReasonCode.WRITE_NEEDS_CONFIRMATION
+    )
+
+
 def post_tool_checks(
     policy_facts: list[dict[str, Any]], config: PolicyConfig
 ) -> list[PolicyDecision]:

@@ -14,6 +14,7 @@ from ai_backend.bank.models import (
     PaymentRequest,
     PaymentResult,
     ProductDetail,
+    RecurringPayments,
     TransactionDetailPolicyView,
     TransactionPage,
     TransactionQuery,
@@ -25,6 +26,7 @@ METHODS = frozenset(
     {
         "ping", "get_session", "get_balances", "list_transactions", "get_transaction",
         "get_product", "get_rate", "preview_payment", "execute_payment",
+        "get_recurring_payments",
     }
 )
 
@@ -87,6 +89,13 @@ class BankClient(Protocol):
     async def get_rate(
         self, source: Currency, target: Currency, on: date | None = None
     ) -> ExchangeRate: ...
+
+    async def get_recurring_payments(
+        self, s: Session, as_of: date | None = None
+    ) -> RecurringPayments:
+        """`GET /recurring-payments`: monthly recurring payments, paid or still due in the month
+        of `as_of` (today by default)."""
+        ...
 
     async def preview_payment(self, s: Session, req: PaymentRequest) -> PaymentResult:
         """`?dry_run=true`: what would happen, with nothing recorded."""

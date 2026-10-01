@@ -4,7 +4,11 @@ import ReactMarkdown, { type Components, type ExtraProps } from "react-markdown"
 import remarkGfm from "remark-gfm";
 import {
     BookOpen,
+    Download,
+    FileSpreadsheet,
+    FileText,
     Headset,
+    LoaderCircle,
     Lightbulb,
     Maximize2,
     Minimize2,
@@ -15,7 +19,7 @@ import {
     X,
 } from "lucide-react";
 import { cn } from "cn";
-import { api, ApiError, type ChatRequest, type ChatResponse } from "@/api";
+import { api, ApiError, downloadChatFile, type ChatFile, type ChatRequest, type ChatResponse } from "@/api";
 import { Button } from "@/components/ui/button";
 import useSession from "@/contexts/session/use-session";
 import { AssistantGuide } from "./assistant-guide";
@@ -469,6 +473,9 @@ function Message({ bubble }: { bubble: Bubble }) {
                         <span className="text-muted-foreground mt-2 block text-xs">{t("assistant.confirmNote")}</span>
                     )}
                 </div>
+                {bubble.res?.files?.map((file) => (
+                    <FileCard key={file.file_id} file={file} />
+                ))}
                 {handoff && (
                     <div className="flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                         <Headset className="size-4 shrink-0" />
@@ -481,6 +488,62 @@ function Message({ bubble }: { bubble: Bubble }) {
             </div>
         </div>
     );
+}
+
+/** A file the assistant generated (Excel or CSV): one click downloads it with the session's token. */
+function FileCard({ file }: { file: ChatFile }) {
+    const { t } = useTranslation();
+    const [state, setState] = useState<"idle" | "busy" | "error">("idle");
+    const Icon = file.format === "xlsx" ? FileSpreadsheet : FileText;
+
+    const download = async () => {
+        setState("busy");
+        try {
+            await downloadChatFile(file);
+            setState("idle");
+        } catch {
+            setState("error");
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-1">
+            <button
+                type="button"
+                onClick={download}
+                disabled={state === "busy"}
+                aria-label={t("assistant.download", { name: file.filename })}
+                title={t("assistant.download", { name: file.filename })}
+                className="bg-background hover:border-primary/50 hover:bg-primary/5 group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-start shadow-sm transition disabled:opacity-60"
+            >
+                <span
+                    className={cn(
+                        "rounded-lg p-1.5",
+                        file.format === "xlsx" ? "bg-emerald-50 text-emerald-700" : "bg-primary/10 text-primary"
+                    )}
+                >
+                    <Icon className="size-5" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-sm font-medium">{file.filename}</span>
+                    <span className="text-muted-foreground text-xs">
+                        {file.format.toUpperCase()} · {t("assistant.fileRows", { count: file.rows })} ·{" "}
+                        {formatSize(file.size_bytes)}
+                    </span>
+                </span>
+                {state === "busy" ? (
+                    <LoaderCircle className="text-muted-foreground size-4 animate-spin" />
+                ) : (
+                    <Download className="text-muted-foreground group-hover:text-primary size-4" />
+                )}
+            </button>
+            {state === "error" && <span className="text-destructive text-xs">{t("assistant.fileError")}</span>}
+        </div>
+    );
+}
+
+function formatSize(bytes: number) {
+    return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`;
 }
 
 /** Agent replies are Markdown (GFM: tables, lists, headings). Raw HTML is not rendered. */

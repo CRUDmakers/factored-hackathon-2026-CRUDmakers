@@ -5,7 +5,7 @@ from __future__ import annotations
 import operator
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import AnyMessage
@@ -16,6 +16,7 @@ from ai_backend.auth.session import Session
 from ai_backend.bank.client import BankClient
 from ai_backend.config import ModelSpec, PolicyConfig
 from ai_backend.conversations.store import ConversationStore
+from ai_backend.files.store import FileStore
 from ai_backend.handoff.store import HandoffStore
 from ai_backend.language.detect import Lang
 from ai_backend.observability.tracing import Tracer
@@ -53,6 +54,7 @@ class AgentState(TypedDict, total=False):
     outcome: str | None
     reply: str | None
     status: str | None  # answered | awaiting_confirmation | handed_off | refused | login_required
+    files: list[dict[str, Any]] | None  # files generated this turn (refs, for the response)
 
 
 # Per-turn fields and their reset values; the service passes them in every request.
@@ -73,6 +75,7 @@ TURN_RESET: dict[str, Any] = {
     "outcome": None,
     "reply": None,
     "status": None,
+    "files": None,
 }
 
 
@@ -94,6 +97,8 @@ class AgentContext:
     history_end: date
     conversations: ConversationStore | None = None
     classifier: Any | None = None  # classifier.predict.RouteClassifier; None = agent decides alone
+    files: FileStore | None = None  # generated spreadsheets; None = generate_files unavailable
+    file_ttl: timedelta = timedelta(hours=24)
 
     @property
     def today(self) -> date:

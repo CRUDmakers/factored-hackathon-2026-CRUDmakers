@@ -66,6 +66,10 @@
         "cancel": "Cancelar",
         "handoffTitle": "Encaminhado para um atendente",
         "handoffRef": "Referência: {{id}}",
+        "download": "Baixar {{name}}",
+        "fileRows_one": "{{count}} linha",
+        "fileRows_other": "{{count}} linhas",
+        "fileError": "Não foi possível baixar o arquivo. Ele pode ter expirado: peça ao assistente para gerá-lo de novo.",
         "error": "A conversa expirou. Envie sua mensagem novamente.",
         "prompts": {
             "balances": {

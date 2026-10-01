@@ -21,6 +21,7 @@ log = structlog.get_logger("trace")
 
 _SECRET_KEYS = ("token", "authorization", "api_key", "apikey", "secret", "password", "key")
 _MAX_TEXT = 200
+_MAX_ITEMS = 5
 
 
 class TraceEvent(BaseModel):
@@ -89,15 +90,20 @@ class Tracer:
 
 
 def redact(args: dict[str, Any]) -> dict[str, Any]:
-    """Drop anything secret-looking and cap long text."""
-    out: dict[str, Any] = {}
-    for key, value in args.items():
-        if any(s in key.lower() for s in _SECRET_KEYS):
-            out[key] = "[redacted]"
-        elif isinstance(value, dict):
-            out[key] = redact(value)
-        elif isinstance(value, str) and len(value) > _MAX_TEXT:
-            out[key] = value[:_MAX_TEXT] + "…"
-        else:
-            out[key] = value
-    return out
+    """Drop anything secret-looking and cap long text and long lists."""
+    return {
+        key: "[redacted]" if any(s in key.lower() for s in _SECRET_KEYS) else _cap(value)
+        for key, value in args.items()
+    }
+
+
+def _cap(value: Any) -> Any:
+    if isinstance(value, dict):
+        return redact(value)
+    if isinstance(value, list):
+        kept = [_cap(v) for v in value[:_MAX_ITEMS]]
+        extra = len(value) - _MAX_ITEMS
+        return kept + [f"… {extra} more"] if extra > 0 else kept
+    if isinstance(value, str) and len(value) > _MAX_TEXT:
+        return value[:_MAX_TEXT] + "…"
+    return value

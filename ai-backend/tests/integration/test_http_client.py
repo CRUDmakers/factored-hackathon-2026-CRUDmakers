@@ -1,6 +1,7 @@
 """HttpBankClient against respx mocks shaped like Node's responses (backend/src/services)."""
 
 import json
+from datetime import date
 from decimal import Decimal
 
 import httpx
@@ -282,3 +283,40 @@ async def test_money_numbers_keep_every_digit(respx_mock):
     )
     b = await _client().get_balances(SESSION)
     assert b.net_worth_usd == Decimal("12345678901234567.89")
+
+
+# backend/src/services/recurring.ts
+RECURRING = {
+    "customer_id": CID,
+    "as_of": "2026-10-05",
+    "month": "2026-10",
+    "items": [
+        {
+            "recurring_id": "REC-0123456789ABCDEF", "method": "bill_payment",
+            "destination_type": "bill", "recipient": "Luz", "amount": 30, "currency": "USD",
+            "source_product_id": "PRD-1", "description": None,
+            "months": ["2026-08", "2026-09"], "consecutive_months": 2,
+            "last_paid_at": "2026-09-10T12:00:00.000Z",
+            "last_transaction_id": "TRX-ABCDEFGHIJKLMNOPQRST", "due_date": "2026-10-10",
+            "next_due_date": "2026-10-10",
+            "status": "due", "overdue": False, "scheduled_payment_id": None,
+            "payment": {
+                "method": "bill_payment", "source_product_id": "PRD-1", "amount": 30,
+                "currency": "USD", "destination": {"barcode": "2" * 44, "biller_name": "Luz"},
+            },
+        }
+    ],
+    "summary": {"recurring": 1, "due": 1, "due_totals": [{"currency": "USD", "amount": 30}]},
+}
+
+
+async def test_recurring_payments_parse_into_payable_requests(respx_mock):
+    route = respx_mock.get(f"{BASE}/api/customers/{CID}/recurring-payments").respond(
+        json=RECURRING
+    )
+    r = await _client().get_recurring_payments(SESSION, date(2026, 10, 5))
+    assert route.calls.last.request.url.params["as_of"] == "2026-10-05"
+    [item] = r.items
+    assert isinstance(item.payment.destination, BillDestination)
+    assert item.payment.endpoint() == "bill-payments" and item.status == "due"
+    assert "payment" not in item.llm_view()

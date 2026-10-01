@@ -14,6 +14,9 @@ Differences, all deliberate:
 
 from __future__ import annotations
 
+import calendar
+import hashlib
+import json
 import re
 import unicodedata
 from collections.abc import Callable
@@ -42,11 +45,15 @@ from ai_backend.bank.models import (
     PaymentResult,
     PixDestination,
     ProductDetail,
+    RecurringPayments,
     TransactionDetailPolicyView,
     TransactionPage,
     TransactionQuery,
     TransferDestination,
 )
+
+# backend/src/services/recurring.ts: how many months before the reference month are searched.
+RECURRING_MONTHS_BACK = 12
 
 # backend/src/lib/domain.ts
 CHECKING, SAVINGS, DEBIT_CARD = "Cuenta Corriente", "Cuenta Ahorro", "Tarjeta Débito"
@@ -331,6 +338,100 @@ class FakeBankClient:
         self, source: Currency, target: Currency, on: date | None = None
     ) -> ExchangeRate:
         return self._rate(source, target, on)
+
+    async def get_recurring_payments(
+        self, s: Session, as_of: date | None = None
+    ) -> RecurringPayments:
+        """backend/src/services/recurring.ts. The fixture has no schedules, so nothing is
+        `scheduled`."""
+        customer_id = await self._authorise(s)
+        as_of = as_of or self._today()
+        reference = _month_index(as_of)
+        rows = sorted(
+            (
+                t
+                for t in self._fx.transactions.values()
+                if t.customer_id == customer_id
+                and t.origin == "simulated"
+                and t.status == "Approved"
+                and t.transaction_type in ("Payment", "Transfer")
+                and t.payment_method
+                and reference - RECURRING_MONTHS_BACK
+                <= _month_index(t.transaction_date)
+                <= reference
+            ),
+            key=lambda t: (t.transaction_date, t.transaction_id),
+        )
+        groups: dict[str, tuple[dict[str, Any], str | None, list[FixtureTransaction]]] = {}
+        for t in rows:
+            destination, recipient = _recurring_destination(t.counterparty or {})
+            key = json.dumps(
+                [t.payment_method, destination, f"{t.amount:.2f}", t.currency],
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+            groups.setdefault(key, (destination, recipient, []))[2].append(t)
+
+        items = []
+        for key, (destination, recipient, own) in groups.items():
+            months = list(dict.fromkeys(_month_index(t.transaction_date) for t in own))
+            last, streak = months[-1], 1
+            while streak < len(months) and months[-1 - streak] == last - streak:
+                streak += 1
+            if streak < 2 or last < reference - 1:
+                continue
+            latest = own[-1]
+            paid = last == reference
+            day = latest.transaction_date.day
+            due_date = _same_day_in(reference, day)
+            next_due = _same_day_in(reference + 1, day) if paid else due_date
+            payment = {
+                "method": latest.payment_method,
+                "source_product_id": latest.product_id,
+                "amount": latest.amount,
+                "currency": latest.currency,
+                "description": latest.description,
+                "destination": destination,
+            }
+            items.append(
+                {
+                    "recurring_id": "REC-" + hashlib.sha256(key.encode()).hexdigest()[:16].upper(),
+                    "method": latest.payment_method,
+                    "destination_type": (latest.counterparty or {}).get("type"),
+                    "recipient": recipient,
+                    "amount": latest.amount,
+                    "currency": latest.currency,
+                    "source_product_id": latest.product_id,
+                    "description": latest.description,
+                    "months": [_month_label(m) for m in months[-streak:]],
+                    "consecutive_months": streak,
+                    "last_paid_at": latest.transaction_date,
+                    "last_transaction_id": latest.transaction_id,
+                    "due_date": due_date,
+                    "next_due_date": next_due,
+                    "status": "paid" if paid else "due",
+                    "overdue": not paid and next_due < as_of,
+                    "scheduled_payment_id": None,
+                    "payment": {k: v for k, v in payment.items() if v is not None},
+                }
+            )
+        items.sort(key=lambda i: (i["due_date"], i["recurring_id"]))
+        totals: dict[str, Decimal] = {}
+        for i in items:
+            if i["status"] == "due":
+                totals[i["currency"]] = totals.get(i["currency"], Decimal(0)) + i["amount"]
+        return RecurringPayments.model_validate(
+            {
+                "as_of": as_of,
+                "month": _month_label(reference),
+                "items": items,
+                "summary": {
+                    "recurring": len(items),
+                    "due": sum(i["status"] == "due" for i in items),
+                    "due_totals": [{"currency": c, "amount": a} for c, a in totals.items()],
+                },
+            }
+        )
 
     async def preview_payment(self, s: Session, req: PaymentRequest) -> PaymentResult:
         return self._payment(await self._authorise(s), req, dry_run=True)
@@ -743,6 +844,46 @@ class FakeBankClient:
 
     def _new_id(self, prefix: str) -> str:
         return f"{prefix}-SIM{self._next():017d}"
+
+
+def _month_index(day: date) -> int:
+    return day.year * 12 + day.month - 1
+
+
+def _month_label(index: int) -> str:
+    return f"{index // 12}-{index % 12 + 1:02d}"
+
+
+def _same_day_in(month: int, day: int) -> date:
+    """The same day in another month, capped at its last day (Jan 31 → Feb 28)."""
+    year, number = divmod(month, 12)
+    return date(year, number + 1, min(day, calendar.monthrange(year, number + 1)[1]))
+
+
+def _recurring_destination(cp: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+    """The scheduled-payment `destination` and the recipient's name, from a stored counterparty."""
+
+    def present(**fields: Any) -> dict[str, Any]:
+        return {k: v for k, v in fields.items() if v is not None}
+
+    match cp.get("type"):
+        case "bill":
+            return present(barcode=cp["barcode"], biller_name=cp.get("biller_name")), cp.get(
+                "biller_name"
+            )
+        case "pix":
+            return {"pix_key": cp["pix_key"]}, cp.get("recipient_name")
+        case "external":
+            beneficiary = present(
+                name=cp["name"],
+                account_number=cp["account_number"],
+                bank_name=cp.get("bank_name"),
+                document_number=cp.get("document_number"),
+                country=cp.get("country"),
+            )
+            return {"beneficiary": beneficiary}, cp["name"]
+        case _:
+            return {"to_product_id": cp.get("to_product_id")}, cp.get("recipient_name")
 
 
 def _explain_status(status: str, response_code: str | None) -> dict[str, Any]:

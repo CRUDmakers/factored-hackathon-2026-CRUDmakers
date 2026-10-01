@@ -399,6 +399,18 @@ export interface ChatRequest {
   confirmation?: { action_id: string; decision: 'approve' | 'reject' };
 }
 
+/** Planilha gerada pelo assistente; baixe com `downloadChatFile`. */
+export interface ChatFile {
+  file_id: string;
+  filename: string;
+  format: 'xlsx' | 'csv';
+  media_type: string;
+  size_bytes: number;
+  rows: number;
+  download_url: string;
+  expires_at: string;
+}
+
 export interface ChatResponse {
   conversation_id: string;
   turn_id: string;
@@ -407,6 +419,7 @@ export interface ChatResponse {
   language: 'es' | 'pt';
   pending_action: { action_id: string; summary: string; preview: PaymentResult; expires_at: string } | null;
   handoff: { handoff_id: string } | null;
+  files?: ChatFile[];
   trace_id: string;
 }
 
@@ -436,3 +449,32 @@ export const api = {
     request<Conversion>('GET', '/api/exchange-rates/convert', { query, auth: false }),
   chat: (body: ChatRequest) => request<ChatResponse>('POST', '/v1/chat', { body, base: AI_URL }),
 };
+
+/** Baixa um arquivo gerado pelo assistente (precisa do token, então não dá para usar um <a href>). */
+export async function downloadChatFile(file: ChatFile): Promise<void> {
+  const headers: Record<string, string> = current ? { authorization: `Bearer ${current.token}` } : {};
+  let res: Response;
+  try {
+    res = await fetch(AI_URL + file.download_url, { headers });
+  } catch {
+    throw new ApiError(0, 'network_error', `Não foi possível conectar à API (${AI_URL}).`);
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
+    const err = new ApiError(res.status, data?.error ?? 'http_error', data?.message ?? `HTTP ${res.status}`);
+    // 401: sessão expirada ou encerrada -> volta ao login, como em `request`.
+    if (res.status === 401 && current) {
+      clearSession();
+      onSessionLost('expired');
+    }
+    throw err;
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

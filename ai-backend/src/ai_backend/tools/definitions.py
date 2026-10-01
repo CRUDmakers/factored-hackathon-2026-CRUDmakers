@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any, Literal
 
@@ -32,6 +32,7 @@ from ai_backend.bank.models import (
     TransactionType,
     last4,
 )
+from ai_backend.files.store import FileStore
 from ai_backend.fx.convert import Side, convert
 
 ToolKind = Literal["read", "write", "escalate"]
@@ -54,6 +55,10 @@ class ToolContext:
     bank: BankClient
     session: Session
     today: date
+    # Where generate_files stores what it builds; None where files aren't offered (eval B1).
+    files: FileStore | None = None
+    conversation_id: str | None = None
+    file_ttl: timedelta = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
@@ -73,6 +78,8 @@ class ToolResult:
     error_message: str | None = None
     # Policy-view facts (fraud flag, product status…): for the policy engine, never the model.
     policy_facts: list[dict[str, Any]] = field(default_factory=list)
+    # Generated files (refs, no content): returned to the chat for download, never to the model.
+    files: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def error(cls, code: str, message: str) -> ToolResult:

@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ai_backend.files.models import MAX_FILES, FileSpec
 from ai_backend.observability.tracing import TraceEvent
 
 
@@ -53,6 +54,17 @@ class HandoffRef(BaseModel):
     handoff_id: str
 
 
+class FileRef(BaseModel):
+    file_id: str
+    filename: str
+    format: Literal["xlsx", "csv"]
+    media_type: str
+    size_bytes: int
+    rows: int
+    download_url: str  # relative to the AI backend; GET it with the same bearer token
+    expires_at: str
+
+
 class ChatResponse(BaseModel):
     conversation_id: str
     turn_id: str
@@ -61,6 +73,7 @@ class ChatResponse(BaseModel):
     language: str
     pending_action: PendingAction | None = None
     handoff: HandoffRef | None = None
+    files: list[FileRef] = Field(default_factory=list)
     trace_id: str
 
 
@@ -77,3 +90,16 @@ class ErrorResponse(BaseModel):
 class TraceResponse(BaseModel):
     conversation_id: str
     events: list[TraceEvent]
+
+
+class FilesRequest(BaseModel):
+    """The JSON the assistant sends to `generate_files`, posted directly (same schema)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str | None = None
+    files: list[FileSpec] = Field(min_length=1, max_length=MAX_FILES)
+
+
+class FilesResponse(BaseModel):
+    files: list[FileRef]
