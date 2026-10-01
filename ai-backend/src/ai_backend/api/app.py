@@ -6,9 +6,10 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from fastapi import FastAPI, Header, Request, Response, status
@@ -26,6 +27,7 @@ from ai_backend.agent.graph import build_graph
 from ai_backend.agent.service import (
     ChatService,
     ConversationNotFound,
+    FileNotFound,
     HandoffNotFound,
     LoginRequired,
 )
@@ -34,6 +36,8 @@ from ai_backend.api.schemas import (
     ChatResponse,
     Check,
     ErrorResponse,
+    FilesRequest,
+    FilesResponse,
     HealthResponse,
     LoginRequiredResponse,
     TraceResponse,
@@ -53,6 +57,8 @@ from ai_backend.conversations.store import (
     MemoryConversationStore,
     SqliteConversationStore,
 )
+from ai_backend.files.models import GenerateFilesArgs
+from ai_backend.files.store import FileStore, MemoryFileStore, SqliteFileStore
 from ai_backend.handoff.models import Handoff
 from ai_backend.handoff.store import HandoffStore, MemoryHandoffStore, SqliteHandoffStore
 from ai_backend.llm.registry import ModelNotConfigured, build_chat_model
@@ -136,6 +142,8 @@ async def build_state(
             classifier=classifier,
             clock=clock,
             history_end=settings.history_end,
+            files=stores.files,
+            file_ttl=timedelta(hours=settings.file_ttl_hours),
         )
     return AppState(
         settings, models, policy, bank, service, problem, stores.check, classifier_status
@@ -168,6 +176,7 @@ class Storage:
     traces: TraceStore
     handoffs: HandoffStore
     lock: ConversationLock
+    files: FileStore
     check: Callable[[], Awaitable[None]] | None = None
 
 
@@ -180,6 +189,7 @@ async def _storage(settings: Settings, stack: AsyncExitStack) -> Storage:
             MemoryTraceStore(),
             MemoryHandoffStore(),
             InProcessLock(),
+            MemoryFileStore(),
         )
     if url.startswith("sqlite:///"):
         path = Path(url.removeprefix("sqlite:///"))
@@ -187,12 +197,15 @@ async def _storage(settings: Settings, stack: AsyncExitStack) -> Storage:
         checkpointer = await stack.enter_async_context(AsyncSqliteSaver.from_conn_string(str(path)))
         trace_store = SqliteTraceStore(path)
         await trace_store.purge_older_than(settings.trace_retention_days)
+        file_store = SqliteFileStore(path)
+        await file_store.purge_expired(datetime.now(UTC))
         return Storage(
             checkpointer,
             SqliteConversationStore(path),
             trace_store,
             SqliteHandoffStore(path),
             InProcessLock(),
+            file_store,
         )
     if url.startswith(("postgresql://", "postgres://")):
         await storage.ensure_database(url)
@@ -203,15 +216,18 @@ async def _storage(settings: Settings, stack: AsyncExitStack) -> Storage:
         conversations = storage.PostgresConversationStore(pool)
         traces = storage.PostgresTraceStore(pool)
         handoffs = storage.PostgresHandoffStore(pool)
-        for store in (conversations, traces, handoffs):
+        files = storage.PostgresFileStore(pool)
+        for store in (conversations, traces, handoffs, files):
             await store.setup()
         await traces.purge_older_than(settings.trace_retention_days)
+        await files.purge_expired(datetime.now(UTC))
         return Storage(
             saver,
             conversations,
             traces,
             handoffs,
             storage.PostgresAdvisoryLock(pool),
+            files,
             check=lambda: storage.ping(pool),
         )
     raise ConfigError(
@@ -239,6 +255,8 @@ def create_app(
         allow_origins=settings.cors_origin_list(),
         allow_methods=["GET", "POST"],
         allow_headers=["Authorization", "Content-Type"],
+        # The browser reads the download's name from it (GET /v1/files/{file_id}).
+        expose_headers=["Content-Disposition"],
     )
 
     @app.get("/v1/health", response_model=HealthResponse)
@@ -287,6 +305,7 @@ def create_app(
             language=result.language,
             pending_action=result.pending_action,
             handoff={"handoff_id": result.handoff_id} if result.handoff_id else None,
+            files=result.files,
             trace_id=result.trace_id,
         )
 
@@ -329,7 +348,63 @@ def create_app(
         except HandoffNotFound:
             return _error(404, "handoff_not_found", "No such handoff.")
 
+    @app.post(
+        "/v1/files",
+        response_model=FilesResponse,
+        status_code=201,
+        responses={401: {"model": LoginRequiredResponse}, 404: {"model": ErrorResponse}},
+    )
+    async def create_files(
+        body: FilesRequest, request: Request, authorization: str | None = Header(default=None)
+    ) -> Any:
+        """Build Excel/CSV files from the same JSON the assistant sends to `generate_files`."""
+        state: AppState = request.app.state.ai
+        if state.service is None:
+            return _error(503, "model_unavailable", "The assistant model is not configured.")
+        try:
+            stored = await state.service.create_files(
+                _bearer(authorization), GenerateFilesArgs(files=body.files), body.conversation_id
+            )
+        except LoginRequired:
+            return _login_required()
+        except ConversationNotFound:
+            return _error(404, "conversation_not_found", "No such conversation.")
+        return FilesResponse(files=[f.ref() for f in stored])
+
+    @app.get(
+        "/v1/files/{file_id}",
+        response_class=Response,
+        responses={401: {"model": LoginRequiredResponse}, 404: {"model": ErrorResponse}},
+    )
+    async def download_file(
+        file_id: str, request: Request, authorization: str | None = Header(default=None)
+    ) -> Any:
+        """A generated file, only for its customer and until it expires."""
+        state: AppState = request.app.state.ai
+        if state.service is None:
+            return _error(503, "model_unavailable", "The assistant model is not configured.")
+        try:
+            record = await state.service.file(_bearer(authorization), file_id)
+        except LoginRequired:
+            return _login_required()
+        except FileNotFound:
+            return _error(404, "file_not_found", "No such file, or it expired.")
+        return Response(
+            content=record.content,
+            media_type=record.media_type,
+            headers={
+                "Content-Disposition": _attachment(record.filename),
+                "Cache-Control": "private, no-store",
+            },
+        )
+
     return app
+
+
+def _attachment(filename: str) -> str:
+    """An ASCII fallback plus the UTF-8 name (RFC 6266), so "extracto_año.xlsx" survives."""
+    fallback = filename.encode("ascii", "replace").decode().replace("?", "_").replace('"', "_")
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename)}"
 
 
 def _bearer(authorization: str | None) -> str | None:

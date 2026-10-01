@@ -406,6 +406,55 @@ class PaymentResult(_Response):
     preview: bool = False
 
 
+# ---------- recurring payments ----------
+
+
+class RecurringPayment(_Response):
+    """One monthly recurring payment from `GET /recurring-payments`: the same destination, amount
+    and currency in at least 2 consecutive months. `payment` pays it again as last time."""
+
+    recurring_id: str
+    method: PaymentMethod
+    destination_type: Literal["internal", "external", "pix", "bill"]
+    recipient: str | None = None
+    amount: Decimal
+    currency: Currency
+    source_product_id: str
+    description: str | None = None
+    months: list[str]
+    consecutive_months: int
+    last_paid_at: AwareDatetime
+    last_transaction_id: str
+    due_date: Date  # expected in the reference month (for paid ones, the day it was paid)
+    next_due_date: Date
+    status: Literal["paid", "due", "scheduled"]
+    overdue: bool
+    scheduled_payment_id: str | None = None
+    payment: PaymentRequest
+
+    def llm_view(self) -> dict[str, object]:
+        # The payment body (account and document numbers) stays out of the model's view.
+        return self.model_dump(mode="json", exclude={"payment", "scheduled_payment_id"})
+
+
+class DueTotal(_Response):
+    currency: Currency
+    amount: Decimal
+
+
+class RecurringSummary(_Response):
+    recurring: int
+    due: int
+    due_totals: list[DueTotal]
+
+
+class RecurringPayments(_Response):
+    as_of: Date
+    month: str
+    items: list[RecurringPayment]
+    summary: RecurringSummary
+
+
 def aware(value: datetime) -> datetime:
     """Node's timestamps are UTC; the fixture's are naive UTC."""
     return value if value.tzinfo else value.replace(tzinfo=UTC)

@@ -12,7 +12,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Literal
 
 from langchain_core.messages import HumanMessage
@@ -24,6 +24,9 @@ from ai_backend.auth.session import Session
 from ai_backend.bank.client import AuthExpired, BankClient
 from ai_backend.config import ModelSpec, PolicyConfig
 from ai_backend.conversations.store import ConversationStore
+from ai_backend.files import service as files_service
+from ai_backend.files.models import GenerateFilesArgs, StoredFile
+from ai_backend.files.store import FileStore, MemoryFileStore
 from ai_backend.handoff.models import Handoff
 from ai_backend.handoff.store import HandoffStore
 from ai_backend.observability.store import TraceStore
@@ -49,6 +52,10 @@ class HandoffNotFound(Exception):
     """Unknown handoff, or one that belongs to another customer (indistinguishable)."""
 
 
+class FileNotFound(Exception):
+    """Unknown or expired file, or one that belongs to another customer (indistinguishable)."""
+
+
 @dataclass(frozen=True)
 class TurnResult:
     conversation_id: str
@@ -59,6 +66,7 @@ class TurnResult:
     trace_id: str
     pending_action: dict[str, Any] | None = None
     handoff_id: str | None = None
+    files: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -77,6 +85,8 @@ class ChatService:
     history_end: date
     locks: ConversationLock = field(default_factory=InProcessLock)
     classifier: Any | None = None
+    files: FileStore = field(default_factory=MemoryFileStore)
+    file_ttl: timedelta = timedelta(hours=24)
 
     async def authenticate(self, token: str | None) -> Session:
         if not token:
@@ -142,6 +152,8 @@ class ChatService:
             history_end=self.history_end,
             conversations=self.conversations,
             classifier=self.classifier,
+            files=self.files,
+            file_ttl=self.file_ttl,
         )
         text = message or CONFIRMATION_TEXT[(confirmation or {}).get("decision", "reject")]
         try:
@@ -182,6 +194,7 @@ class ChatService:
                 else None
             ),
             handoff_id=state.get("handoff_id"),
+            files=state.get("files") or [],
         )
 
     async def trace(self, token: str | None, conversation_id: str) -> list[TraceEvent]:
@@ -194,4 +207,31 @@ class ChatService:
         record = await self.handoffs.get(handoff_id)
         if record is None or record.customer_id != session.customer_id:
             raise HandoffNotFound()
+        return record
+
+    async def create_files(
+        self, token: str | None, args: GenerateFilesArgs, conversation_id: str | None = None
+    ) -> list[StoredFile]:
+        """The same generation the `generate_files` tool runs, for a JSON posted directly."""
+        session = await self.authenticate(token)
+        if conversation_id is not None:
+            await self.owned_conversation(session, conversation_id)
+        return await files_service.generate(
+            self.files,
+            args,
+            customer_id=session.customer_id,
+            conversation_id=conversation_id,
+            now=datetime.now(UTC),
+            ttl=self.file_ttl,
+        )
+
+    async def file(self, token: str | None, file_id: str) -> StoredFile:
+        session = await self.authenticate(token)
+        record = await self.files.get(file_id)
+        if (
+            record is None
+            or record.customer_id != session.customer_id
+            or record.expires_at <= datetime.now(UTC)
+        ):
+            raise FileNotFound()
         return record

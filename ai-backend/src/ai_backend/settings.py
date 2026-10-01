@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     # "sqlite:///<path>" for checkpoints, conversations and traces; "memory://" for tests.
     db_url: str = "sqlite:///./ai_backend.db"
     trace_retention_days: int = 30
+    # How long a generated Excel/CSV file can be downloaded (it holds the customer's data).
+    file_ttl_hours: int = 24
     log_level: str = "INFO"
 
     # Pins "now" (fake bank, agent's "today") for reproducible eval runs; real time if unset.

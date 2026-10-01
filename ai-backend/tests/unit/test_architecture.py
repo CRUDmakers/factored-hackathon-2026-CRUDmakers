@@ -7,7 +7,7 @@ import pytest
 
 ROOT = Path(__file__).parents[2]
 PKG = ROOT / "src" / "ai_backend"
-DOMAIN = [PKG / d for d in ("bank", "tools", "policy", "handoff", "fx", "language")] + [
+DOMAIN = [PKG / d for d in ("bank", "tools", "policy", "handoff", "fx", "language", "files")] + [
     ROOT / "eval" / "metrics.py"
 ]
 FORBIDDEN = ("langgraph", "langchain", "langchain_core", "anthropic", "openai")

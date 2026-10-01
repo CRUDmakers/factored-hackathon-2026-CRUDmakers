@@ -240,6 +240,7 @@ Tools are thin, typed wrappers over the `BankClient`. Each returns a Pydantic mo
 | `transfer_money` | write → preview → confirm | `POST /transfers` | #2 transfers (own products, same bank, other bank) | **P0** |
 | `pay_bill` | write → preview → confirm | `POST /bill-payments` | #2 bill payments | **P0** |
 | `handoff_to_human` | escalate | none | the human path | **P0** |
+| `generate_files` | read (no bank call) | none: builds xlsx/csv from rows the agent already read; download at `GET /v1/files/{id}` (`CHAT_API.md`) | exports | P1 |
 | `get_product_details` | read | `GET /products/{id}` | #10 expiry/interest | **P1** |
 | `get_spending_summary` | read | `GET /reports/spending` | #7 spending by category | **P1** |
 | `get_loan_adjustments` | read | `GET /adjustments` | #9 loan adjustment | **P1** |

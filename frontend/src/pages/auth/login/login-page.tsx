@@ -11,9 +11,12 @@ import { Trans, useTranslation } from "react-i18next";
 import bankingCsAiApi from "@/services/api/banking-cs-ai.api";
 import useSafeCallback from "@/hooks/useSafeCallback";
 import { useNavigate } from "react-router-dom";
+import useSystem from "@/contexts/system/use-system";
+import { TEST_CUSTOMERS } from "@/testCustomers";
 
 export default function LoginPage() {
     const { t: tValid } = useTranslation("validation");
+    const { language } = useSystem();
 
     const navigate = useNavigate();
 
@@ -77,6 +80,35 @@ export default function LoginPage() {
                     </Trans>
                 )}
             </Button>
+
+            <div className="flex flex-col gap-2">
+                <span className="text-muted-foreground text-sm">
+                    <Trans ns={"auth"} i18nKey={"signIn.testCustomers"}>
+                        Test customers
+                    </Trans>
+                </span>
+                {TEST_CUSTOMERS.map((c) => (
+                    <Button
+                        key={c.id}
+                        type="button"
+                        variant="outline"
+                        className="h-auto justify-start gap-3 py-2 text-left"
+                        disabled={form.formState.isSubmitting}
+                        onClick={() => {
+                            form.setValue("customerId", c.id);
+                            void form.handleSubmit(onSubmit)();
+                        }}
+                    >
+                        <span className="text-muted-foreground w-6 text-xs font-semibold">{c.country}</span>
+                        <span className="flex flex-col">
+                            <strong className="text-sm">{c.name}</strong>
+                            <span className="text-muted-foreground text-xs">
+                                {c.id} · {c.note[language === "pt" ? "pt" : "es"]}
+                            </span>
+                        </span>
+                    </Button>
+                ))}
+            </div>
         </AuthLayoutContent>
     );
 }

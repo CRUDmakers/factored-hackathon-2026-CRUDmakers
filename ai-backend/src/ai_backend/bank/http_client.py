@@ -37,6 +37,7 @@ from ai_backend.bank.models import (
     PaymentRequest,
     PaymentResult,
     ProductDetail,
+    RecurringPayments,
     TransactionDetailPolicyView,
     TransactionPage,
     TransactionQuery,
@@ -111,6 +112,15 @@ class HttpBankClient:
             params["date"] = on.isoformat()
         data = await self._request("GET", "/api/exchange-rates", params=params)
         return _parse(ExchangeRate, data)
+
+    async def get_recurring_payments(
+        self, s: Session, as_of: date | None = None
+    ) -> RecurringPayments:
+        params = {"as_of": as_of.isoformat()} if as_of else None
+        data = await self._request(
+            "GET", _customer(s, "recurring-payments"), token=_token(s), params=params
+        )
+        return _parse(RecurringPayments, data)
 
     async def preview_payment(self, s: Session, req: PaymentRequest) -> PaymentResult:
         data = await self._request(

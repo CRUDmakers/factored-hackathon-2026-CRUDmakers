@@ -26,7 +26,8 @@ def test_every_p0_tool_is_registered():
     assert kinds == {
         "get_balances": "read", "search_transactions": "read", "get_transaction": "read",
         "convert_currency": "read", "transfer_money": "write", "pay_bill": "write",
-        "handoff_to_human": "escalate",
+        "handoff_to_human": "escalate", "generate_files": "read",
+        "get_recurring_payments": "read", "pay_recurring_payments": "write",
     }
 
 

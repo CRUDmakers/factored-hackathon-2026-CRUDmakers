@@ -103,6 +103,7 @@ Todos os endpoints de cliente ficam em `/api/customers/{customerId}/…` e exige
 | 2. Pix por e-mail, celular ou documento | `POST /pix` |
 | 2. Pagamento de boleto | `POST /bill-payments` |
 | 3. Pagamentos agendados/recorrentes | `POST, GET /scheduled-payments`, `GET, PATCH, DELETE /scheduled-payments/{id}` |
+| 3. Pagamentos recorrentes mensais (o que falta pagar no mês) | `GET /recurring-payments?as_of=` |
 | 4. Câmbio | `GET /api/exchange-rates`, `/convert`, `/history`, `/pairs` |
 | 5. Status do pagamento e motivo da recusa | `GET /transactions/{id}/status` |
 | 6. Últimas transações e relatório | `GET /transactions`, `GET /reports/transactions` |

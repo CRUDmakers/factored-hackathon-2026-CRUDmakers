@@ -124,6 +124,26 @@ Cancelled (ES):
 >
 > **Assistant** · `answered`: Listo, cancelé la operación. No se movió dinero.
 
+## Expected payments this month
+
+The assistant finds what the customer pays every month (the same transfer, Pix or bill, same amount, at least 2 months in a row), shows what is expected this month (already paid, scheduled or still due) and can pay all the due ones with a single confirmation. Each payment is then executed and verified one by one, as above.
+
+**Behind the answer:** `get_recurring_payments` reads Node's `GET /recurring-payments`; `pay_recurring_payments` only takes the ids it returned, so destinations and amounts come from the bank, never from the model. Every payment is previewed first; if one would be declined, nothing is paid. The total must also be within the amount limit.
+
+Marta (`CLI-25NDK326VNE4`, demo data from `backend/scripts/seed-marta-recurring.sql`), in October (ES):
+
+> **Customer:** ¿Qué pagos tengo previstos este mes?
+>
+> **Assistant** · `answered`: Smart Fit (99.900 COP) ya está pago el 1/10. Faltan: arriendo 1.850.000 (3/10), Internet Claro 89.900 (5/10), Netflix 44.900 (12/10) y Claude Pro 84.000 (18/10). Total pendiente: 2.068.800 COP.
+>
+> **Customer:** Págalos todos
+>
+> **Assistant** · `awaiting_confirmation`: Pagar estos 4 pagos recurrentes: … Total: 2.068.800,00 COP. ¿Confirmas? *[Confirmar] [Cancelar]*
+>
+> **Customer:** Sí
+>
+> **Assistant** · `answered`: Resultado de los pagos: one line per payment, each with its receipt (`TRX-…`).
+
 ## When it asks a clarifying question
 
 If a request matches several records, or is missing the account, the amount or the destination, the assistant asks instead of guessing.

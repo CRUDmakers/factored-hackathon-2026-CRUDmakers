@@ -28,6 +28,10 @@ export const PeriodQuery = Type.Object({
   to: Type.Optional(Day('Data final (YYYY-MM-DD). Padrão: data da última transação do cliente.')),
 });
 
+export const RecurringQuery = Type.Object({
+  as_of: Type.Optional(Day('Data de referência (YYYY-MM-DD): define o mês avaliado. Padrão: hoje.')),
+});
+
 export const ProductsQuery = Type.Object({
   type: Type.Optional(Type.String({ description: 'Tipo, ex.: Tarjeta Crédito, Cuenta Corriente' })),
   status: Type.Optional(Type.String({ description: 'Active, Closed, Blocked ou Suspended' })),

@@ -52,7 +52,7 @@
         "backToChat": "Voltar à conversa",
         "welcome": "Olá, {{name}}! Como posso ajudar?",
         "welcomeAnon": "Olá! Como posso ajudar?",
-        "welcomeText": "Consulto saldos, cartões e movimentos, converto moedas e faço transferências e pagamentos, sempre com a sua confirmação.",
+        "welcomeText": "Consulto saldos, cartões e movimentos, converto moedas, mostro os pagamentos previstos do mês e faço transferências e pagamentos, sempre com a sua confirmação.",
         "tryThis": "Experimente perguntar",
         "seeGuide": "Primeira vez? Veja o guia",
         "suggestions": "Sugestões",
@@ -66,11 +66,19 @@
         "cancel": "Cancelar",
         "handoffTitle": "Encaminhado para um atendente",
         "handoffRef": "Referência: {{id}}",
+        "download": "Baixar {{name}}",
+        "fileRows_one": "{{count}} linha",
+        "fileRows_other": "{{count}} linhas",
+        "fileError": "Não foi possível baixar o arquivo. Ele pode ter expirado: peça ao assistente para gerá-lo de novo.",
         "error": "A conversa expirou. Envie sua mensagem novamente.",
         "prompts": {
             "balances": {
                 "label": "Ver meus saldos",
                 "text": "Qual é o saldo das minhas contas?"
+            },
+            "recurring": {
+                "label": "Pagamentos do mês",
+                "text": "Quais são os meus pagamentos previstos para este mês?"
             },
             "cardDue": {
                 "label": "Fatura do cartão",
@@ -123,6 +131,10 @@
             "payments": {
                 "title": "Transferências e contas",
                 "text": "Transfere entre as suas contas, paga o cartão e paga boletos com código de barras."
+            },
+            "recurring": {
+                "title": "Pagamentos previstos do mês",
+                "text": "Encontra o que você paga todo mês (aluguel, internet, assinaturas), mostra o que já foi pago e o que falta, e paga todos de uma vez com uma única confirmação."
             },
             "handoff": {
                 "title": "Atendente humano",

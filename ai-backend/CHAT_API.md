@@ -33,7 +33,19 @@ type ChatResponse = {
   language: "es" | "pt";               // the language the customer is writing in
   pending_action: PendingAction | null;
   handoff: { handoff_id: string } | null;
+  files: ChatFile[];                   // spreadsheets generated this turn (often empty)
   trace_id: string;
+};
+
+type ChatFile = {
+  file_id: string;
+  filename: string;                    // e.g. "movimientos_junio.xlsx"
+  format: "xlsx" | "csv";
+  media_type: string;
+  size_bytes: number;
+  rows: number;                        // data rows, all sheets
+  download_url: string;                // "/v1/files/{file_id}", relative to the AI backend
+  expires_at: string;                  // ISO time; after it, the download answers 404
 };
 
 type PendingAction = {
@@ -94,10 +106,68 @@ r = await sendChat(token, {
 
 In Docker, pass the URL at build time like `VITE_API_URL`: add `ARG VITE_AI_URL` to `frontend/Dockerfile`, and `VITE_AI_URL: ${FRONTEND_AI_URL:-http://localhost:8000}` to the frontend's build args in `docker-compose.yml`.
 
+## Files (Excel / CSV)
+
+When the customer asks for a spreadsheet ("mándame un Excel con mis movimientos de junio"), the agent reads the data with its tools and calls `generate_files` with a JSON payload. The backend builds the files (`src/ai_backend/files/`), stores them and returns them in `ChatResponse.files`. One call can produce several files.
+
+Show one download button per file. The download needs the bearer token, so fetch it and save the blob (`downloadChatFile` in `frontend/src/api.ts`); a plain `<a href>` won't work.
+
+```
+GET /v1/files/{file_id}            Authorization: Bearer <access_token>
+→ 200, the file, Content-Disposition: attachment; filename="…"; filename*=UTF-8''…
+→ 401 login_required · 404 file_not_found (unknown, another customer's, or expired)
+```
+
+Files belong to the session's customer and expire after `FILE_TTL_HOURS` (default 24); expired rows are deleted at startup.
+
+### The payload
+
+The same JSON is the `generate_files` tool's arguments and the body of `POST /v1/files` (which also takes an optional `conversation_id` the customer owns, and answers `201 {files: ChatFile[]}`).
+
+```json
+{
+  "files": [
+    {
+      "filename": "movimientos_junio",
+      "format": "xlsx",
+      "sheets": [
+        {
+          "name": "Movimientos",
+          "columns": [
+            {"header": "Fecha", "type": "date"},
+            {"header": "Comercio", "type": "text"},
+            {"header": "Monto", "type": "money"},
+            {"header": "Moneda", "type": "text"}
+          ],
+          "rows": [["2026-06-15", "Uber", 12.5, "USD"]]
+        }
+      ]
+    },
+    {
+      "filename": "resumen",
+      "format": "csv",
+      "sheets": [{"name": "Resumen", "columns": [{"header": "Total", "type": "money"}], "rows": [[12.5]]}]
+    }
+  ]
+}
+```
+
+| Rule | |
+|---|---|
+| `files` | 1–5 files |
+| `format` | `xlsx` (1–10 sheets) or `csv` (exactly 1 sheet) |
+| `columns[].type` | `text` (default), `number`, `money` (2 decimals) or `date` (`YYYY-MM-DD` or ISO date-time) |
+| `rows` | ≤ 2000 per sheet, one value per column (`null` = empty). A value that doesn't fit its type is kept as written |
+| Names | `filename` is sanitised and gets the extension; sheet names ≤ 31 characters, unique, without `[ ] : * ? / \` |
+
+xlsx files get a styled, frozen header row, a filter and column widths. csv files are UTF-8 with BOM (Excel shows accents) and comma-separated. Text that a spreadsheet would run as a formula (`=`, `+`, `-`, `@`) is always written as text.
+
 ## Other endpoints
 
 | Method | Path | Returns |
 |---|---|---|
 | `GET` | `/v1/conversations/{conversation_id}/trace` | Every step of the conversation (nodes, tools, policy decisions, tokens, timings), for the human-agent panel and the demo. Only the conversation's customer. |
 | `GET` | `/v1/handoffs/{handoff_id}` | The handoff record: reason codes, priority, verified facts, actions taken, evidence, the model's summary and open questions (ARCHITECTURE §10). Only the handoff's customer, until agent roles exist. |
+| `POST` | `/v1/files` | Builds files from the payload above, for the session's customer. |
+| `GET` | `/v1/files/{file_id}` | A generated file (see above). |
 | `GET` | `/v1/health` | `{status: "ok" \| "degraded", checks: {models, bank, storage}}`; 503 when degraded. |

@@ -23,6 +23,8 @@ from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
+from ai_backend.files.models import StoredFile
+from ai_backend.files.store import COLUMNS as FILE_COLUMNS
 from ai_backend.handoff.models import Handoff
 from ai_backend.observability.tracing import TraceEvent
 
@@ -242,3 +244,52 @@ class PostgresHandoffStore:
             return None
         body = row["body"]
         return Handoff.model_validate(json.loads(body) if isinstance(body, str) else body)
+
+
+class PostgresFileStore:
+    def __init__(self, pool: AsyncConnectionPool) -> None:
+        self._pool = pool
+
+    async def setup(self) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS generated_files ("
+                " file_id TEXT PRIMARY KEY, customer_id TEXT NOT NULL, conversation_id TEXT,"
+                " filename TEXT NOT NULL, format TEXT NOT NULL, media_type TEXT NOT NULL,"
+                " size_bytes INTEGER NOT NULL, rows INTEGER NOT NULL,"
+                " created_at TIMESTAMPTZ NOT NULL, expires_at TIMESTAMPTZ NOT NULL,"
+                " content BYTEA NOT NULL)"
+            )
+
+    async def save(self, file: StoredFile) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                f"INSERT INTO generated_files ({FILE_COLUMNS})"
+                " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    file.file_id,
+                    file.customer_id,
+                    file.conversation_id,
+                    file.filename,
+                    file.format,
+                    file.media_type,
+                    file.size_bytes,
+                    file.rows,
+                    file.created_at,
+                    file.expires_at,
+                    file.content,
+                ),
+            )
+
+    async def get(self, file_id: str) -> StoredFile | None:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(
+                f"SELECT {FILE_COLUMNS} FROM generated_files WHERE file_id = %s", (file_id,)
+            )
+            row = await cur.fetchone()
+        return StoredFile.model_validate(row) if row else None
+
+    async def purge_expired(self, now: datetime) -> int:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute("DELETE FROM generated_files WHERE expires_at <= %s", (now,))
+            return cur.rowcount

@@ -10,7 +10,9 @@ from __future__ import annotations
 from typing import Any
 
 from ai_backend.tools.definitions import P0_READ_TOOLS, ToolSpec
+from ai_backend.tools.files import FILE_TOOLS
 from ai_backend.tools.payments import HandoffArgs, PayBillArgs, TransferMoneyArgs
+from ai_backend.tools.recurring import RECURRING_TOOLS
 
 P0_ACTION_TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
@@ -42,7 +44,9 @@ P0_ACTION_TOOLS: tuple[ToolSpec, ...] = (
     ),
 )
 
-REGISTRY: dict[str, ToolSpec] = {t.name: t for t in (*P0_READ_TOOLS, *P0_ACTION_TOOLS)}
+REGISTRY: dict[str, ToolSpec] = {
+    t.name: t for t in (*P0_READ_TOOLS, *P0_ACTION_TOOLS, *FILE_TOOLS, *RECURRING_TOOLS)
+}
 
 
 def get_tool(name: str) -> ToolSpec | None:
