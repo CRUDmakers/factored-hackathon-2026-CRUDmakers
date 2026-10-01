@@ -36,6 +36,13 @@ models:
     params: {max_tokens: 4096, temperature: 0}
     price_per_mtok: null
     capabilities: [tools]
+  # Router combo: the 9router picks the backing model and falls back when one is out of quota.
+  combo-medium:
+    provider: openai_compatible
+    model: combo-medium
+    params: {max_tokens: 4096, temperature: 0}
+    price_per_mtok: null
+    capabilities: [tools]
   # Model comparison (M5), through the same router, so the same caveats apply.
   gpt-oss-120b:  # open-weight model
     provider: openai_compatible
