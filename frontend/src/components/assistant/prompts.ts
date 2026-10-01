@@ -1,6 +1,7 @@
 import {
     ArrowLeftRight,
     BadgeDollarSign,
+    CalendarClock,
     CreditCard,
     HandCoins,
     Headset,
@@ -12,7 +13,7 @@ import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import useSession from "@/contexts/session/use-session";
 
-export type PromptKey = "balances" | "cardDue" | "lastTx" | "payCard" | "transfer" | "convert" | "declined" | "agent";
+export type PromptKey = "balances" | "recurring" | "cardDue" | "lastTx" | "payCard" | "transfer" | "convert" | "declined" | "agent";
 
 export type Prompt = {
     key: PromptKey;
@@ -50,6 +51,7 @@ export function useSuggestedPrompts(): Prompt[] {
 
     return [
         make("balances", Wallet, true),
+        make("recurring", CalendarClock, true),
         cardNo && make("cardDue", CreditCard, true, { card: cardNo }),
         make("lastTx", Receipt, true),
         cardNo && account && make("payCard", HandCoins, false, { card: cardNo, account, currency: card.currency }),

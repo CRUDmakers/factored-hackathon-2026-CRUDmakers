@@ -1,10 +1,10 @@
 import { useTranslation } from "react-i18next";
-import { ArrowLeftRight, BadgeDollarSign, Ban, CircleCheck, Headset, Receipt, Wallet } from "lucide-react";
+import { ArrowLeftRight, BadgeDollarSign, Ban, CalendarClock, CircleCheck, Headset, Receipt, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Prompt, PromptKey } from "./prompts";
 
-type Capability = "balances" | "transactions" | "currency" | "payments" | "handoff";
+type Capability = "balances" | "transactions" | "currency" | "payments" | "recurring" | "handoff";
 
 /** Each capability of the assistant (ai-backend/ASSISTANT_GUIDE.md) with a prompt to try it. */
 const CAPABILITIES: { key: Capability; icon: LucideIcon; example: PromptKey }[] = [
@@ -12,6 +12,7 @@ const CAPABILITIES: { key: Capability; icon: LucideIcon; example: PromptKey }[] 
     { key: "transactions", icon: Receipt, example: "lastTx" },
     { key: "currency", icon: BadgeDollarSign, example: "convert" },
     { key: "payments", icon: ArrowLeftRight, example: "transfer" },
+    { key: "recurring", icon: CalendarClock, example: "recurring" },
     { key: "handoff", icon: Headset, example: "agent" },
 ];
 

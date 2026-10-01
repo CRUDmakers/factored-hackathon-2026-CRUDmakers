@@ -52,7 +52,7 @@
         "backToChat": "Volver a la conversación",
         "welcome": "¡Hola, {{name}}! ¿En qué le ayudo?",
         "welcomeAnon": "¡Hola! ¿En qué le ayudo?",
-        "welcomeText": "Consulto saldos, tarjetas y movimientos, convierto monedas y hago transferencias y pagos, siempre con su confirmación.",
+        "welcomeText": "Consulto saldos, tarjetas y movimientos, convierto monedas, muestro los pagos previstos del mes y hago transferencias y pagos, siempre con su confirmación.",
         "tryThis": "Pruebe preguntar",
         "seeGuide": "¿Primera vez? Vea la guía",
         "suggestions": "Sugerencias",
@@ -75,6 +75,10 @@
             "balances": {
                 "label": "Ver mis saldos",
                 "text": "¿Cuál es el saldo de mis cuentas?"
+            },
+            "recurring": {
+                "label": "Pagos del mes",
+                "text": "¿Qué pagos tengo previstos este mes?"
             },
             "cardDue": {
                 "label": "Saldo de la tarjeta",
@@ -127,6 +131,10 @@
             "payments": {
                 "title": "Transferencias y pagos",
                 "text": "Transfiere entre sus cuentas, paga la tarjeta y paga facturas con código de barras."
+            },
+            "recurring": {
+                "title": "Pagos previstos del mes",
+                "text": "Encuentra lo que paga cada mes (arriendo, internet, suscripciones), muestra lo que ya pagó y lo que falta, y los paga todos de una vez con una sola confirmación."
             },
             "handoff": {
                 "title": "Agente humano",
