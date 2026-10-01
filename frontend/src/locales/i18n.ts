@@ -27,6 +27,8 @@ i18next
         debug: import.meta.env.VITE_ENV === "development",
 
         fallbackLng: "pt",
+        // React already escapes rendered text; i18next's HTML escaping turned "01/04" into "01&#x2F;04".
+        interpolation: { escapeValue: false },
 
         ns: [...namespaces],
         defaultNS,
