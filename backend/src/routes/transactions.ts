@@ -1,5 +1,5 @@
 import type { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { AdjustmentsQuery, CustomerParams, PeriodQuery, TransactionParams, TransactionsQuery } from '../schemas.js';
+import { AdjustmentsQuery, CustomerParams, PeriodQuery, SpendingQuery, TransactionParams, TransactionsQuery } from '../schemas.js';
 import {
   getAdjustments,
   getReport,
@@ -52,10 +52,12 @@ export const transactionRoutes: FastifyPluginAsyncTypebox = async (app) => {
   app.get('/customers/:customerId/reports/spending', {
     schema: {
       tags: ['Relatórios'],
-      summary: 'Gastos por categoria e por mês: controle financeiro (feature 7)',
-      description: 'Sem datas: 90 dias até a última transação do cliente. Valores em USD.',
+      summary: 'Gastos por categoria, por mês e por cartão: controle financeiro (feature 7)',
+      description:
+        'Sem datas: os últimos `months` meses-calendário até a última transação do cliente. ' +
+        'Cada mês traz a variação sobre o anterior. Valores em USD.',
       params: CustomerParams,
-      querystring: PeriodQuery,
+      querystring: SpendingQuery,
     },
     handler: (req) => getSpending(req.params.customerId, req.query),
   });

@@ -372,11 +372,20 @@ export interface CreateScheduleBody {
 
 export interface Spending {
   period: { from: string; to: string };
+  product_id: string | null;
   currency: string;
   total_spent_usd: number;
   monthly_average_usd: number;
   by_category: { category: string; count: number; total_usd: number; share_pct: number; monthly_average_usd: number }[];
-  by_month: { month: string; total_usd: number; categories: Record<string, number> }[];
+  by_month: { month: string; total_usd: number; change_pct: number | null; categories: Record<string, number> }[];
+  by_product: {
+    product_id: string | null;
+    product_type: string | null;
+    product_number: string | null;
+    total_usd: number;
+    share_pct: number;
+    by_month: { month: string; total_usd: number }[];
+  }[];
 }
 
 export interface Conversion {

@@ -141,25 +141,53 @@ describe('resolvePeriod', () => {
 });
 
 describe('gastos por categoria (feature 7)', () => {
-  it('agrupa gastos aprovados por categoria e mês, em USD', async () => {
+  it('agrupa gastos aprovados por categoria e mês-calendário, em USD, com variação mês a mês', async () => {
     const body = (await app.inject(`/api/customers/${ANA}/reports/spending`)).json();
-    expect(body.period).toEqual({ from: '2026-03-20', to: '2026-06-17' });
+    expect(body.period).toEqual({ from: '2026-04-01', to: '2026-06-17' });
     expect(body.total_spent_usd).toBe(398.5);
-    expect(body.monthly_average_usd).toBe(199.25);
+    expect(body.monthly_average_usd).toBe(132.83);
     expect(body.by_category[0]).toMatchObject({ category: 'Withdrawals', count: 3, total_usd: 150, share_pct: 37.64 });
     expect(body.by_month).toEqual([
-      { month: '2026-05', total_usd: 80, categories: { Health: 80 } },
-      expect.objectContaining({ month: '2026-06', total_usd: 318.5 }),
+      { month: '2026-04', total_usd: 0, change_pct: null, categories: {} },
+      { month: '2026-05', total_usd: 80, change_pct: null, categories: { Health: 80 } },
+      expect.objectContaining({ month: '2026-06', total_usd: 318.5, change_pct: 298.13 }),
     ]);
+  });
+
+  it('`months` define quantos meses inteiros entram no período', async () => {
+    const body = (await app.inject(`/api/customers/${ANA}/reports/spending?months=1`)).json();
+    expect(body.period).toEqual({ from: '2026-06-01', to: '2026-06-17' });
+    expect(body.by_month.map((m: { month: string }) => m.month)).toEqual(['2026-06']);
+  });
+
+  it('by_product reparte o total por cartão/conta; product_id filtra o resto', async () => {
+    const all = (await app.inject(`/api/customers/${ANA}/reports/spending`)).json();
+    const sum = all.by_product.reduce((n: number, p: { total_usd: number }) => n + p.total_usd, 0);
+    expect(sum).toBeCloseTo(398.5, 2);
+    expect(all.by_product[0].by_month.map((m: { month: string }) => m.month)).toEqual(['2026-04', '2026-05', '2026-06']);
+
+    const card = all.by_product.find((p: { product_id: string }) => p.product_id === 'PRD-ANACC0000003');
+    const one = (await app.inject(`/api/customers/${ANA}/reports/spending?product_id=PRD-ANACC0000003`)).json();
+    expect(one.product_id).toBe('PRD-ANACC0000003');
+    expect(one.total_spent_usd).toBe(card.total_usd);
+    expect(one.by_category.map((c: { category: string }) => c.category)).toContain('Food');
+    expect(one.by_product).toEqual(all.by_product);
   });
 
   it('período sem gastos', async () => {
     const body = (await app.inject(`/api/customers/${DIEGO}/reports/spending?from=2026-01-01&to=2026-01-31`)).json();
-    expect(body).toMatchObject({ total_spent_usd: 0, monthly_average_usd: 0, by_category: [], by_month: [] });
+    expect(body).toMatchObject({
+      total_spent_usd: 0,
+      monthly_average_usd: 0,
+      by_category: [],
+      by_month: [{ month: '2026-01', total_usd: 0, change_pct: null, categories: {} }],
+      by_product: [],
+    });
   });
 
-  it('404 para cliente inexistente', async () => {
+  it('404 para cliente inexistente e 400 para months inválido', async () => {
     expect((await app.inject(`/api/customers/${UNKNOWN}/reports/spending`)).statusCode).toBe(404);
+    expect((await app.inject(`/api/customers/${ANA}/reports/spending?months=0`)).statusCode).toBe(400);
   });
 });
 

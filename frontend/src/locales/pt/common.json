@@ -11,7 +11,8 @@
         "home": "Início",
         "assistant": "Assistente",
         "guide": "Guia do assistente",
-        "language": "Idioma"
+        "language": "Idioma",
+        "spending": "Meus gastos"
     },
     "home": {
         "hello": "Olá, {{name}}",
@@ -165,5 +166,61 @@
         "limitsTitle": "O que ele não faz",
         "limitsText": "Investimentos, pedidos de empréstimo e mudança de dados cadastrais. Para isso, use os canais oficiais do banco.",
         "start": "Começar a conversar"
+    },
+    "spending": {
+        "title": "Meus gastos",
+        "subtitle": "Quanto você gasta por mês, em cada cartão e no total. Valores convertidos para dólares.",
+        "allCards": "Todos os cartões e contas",
+        "card": "Cartão ou conta",
+        "months": "{{count}} meses",
+        "custom": "Personalizado",
+        "from": "De",
+        "to": "Até",
+        "apply": "Aplicar",
+        "download": "Baixar relatório (CSV)",
+        "total": "Total gasto",
+        "average": "Média mensal",
+        "trend": "Último mês fechado",
+        "topCategory": "Maior categoria",
+        "up": "Subiu {{pct}}% vs. {{month}}",
+        "down": "Caiu {{pct}}% vs. {{month}}",
+        "flat": "Igual a {{month}}",
+        "noTrend": "Sem mês anterior para comparar",
+        "byMonth": "Tendência mês a mês",
+        "partial": "{{month}} ainda está em andamento (dados até {{day}}); fica fora da comparação.",
+        "byCategory": "Para onde vai o seu dinheiro",
+        "byProduct": "Por cartão e conta",
+        "byProductHint": "Toque em uma linha para filtrar a página por ela.",
+        "share": "do total",
+        "empty": "Nenhum gasto neste período.",
+        "noProduct": "Sem produto",
+        "colProduct": "Cartão/conta",
+        "colTotal": "Total",
+        "colChange": "Variação",
+        "period": "Período",
+        "csvMonth": "Mês",
+        "csvCategory": "Categoria",
+        "csvTransactions": "Transações",
+        "tx_one": "{{count}} transação",
+        "tx_other": "{{count}} transações"
+    },
+    "cat": {
+        "Food": "Alimentação",
+        "Services": "Serviços",
+        "Transport": "Transporte",
+        "Entertainment": "Lazer",
+        "Health": "Saúde",
+        "Other": "Outros",
+        "Withdrawals": "Saques",
+        "Transfers": "Transferências",
+        "Uncategorized": "Sem categoria"
+    },
+    "product": {
+        "Cuenta Corriente": "Conta corrente",
+        "Cuenta Ahorro": "Conta poupança",
+        "Tarjeta Débito": "Cartão de débito",
+        "Tarjeta Crédito": "Cartão de crédito",
+        "Préstamo Personal": "Empréstimo pessoal",
+        "Préstamo Hipotecario": "Financiamento imobiliário"
     }
 }

@@ -28,6 +28,14 @@ export const PeriodQuery = Type.Object({
   to: Type.Optional(Day('Data final (YYYY-MM-DD). Padrão: data da última transação do cliente.')),
 });
 
+export const SpendingQuery = Type.Object({
+  ...PeriodQuery.properties,
+  months: Type.Optional(
+    Type.Integer({ minimum: 1, maximum: 36, description: 'Sem `from`: meses-calendário inteiros até `to`. Padrão: 3.' }),
+  ),
+  product_id: Type.Optional(Type.String({ pattern: '^PRD-', description: 'Só os gastos deste produto/cartão' })),
+});
+
 export const RecurringQuery = Type.Object({
   as_of: Type.Optional(Day('Data de referência (YYYY-MM-DD): define o mês avaliado. Padrão: hoje.')),
 });

@@ -9,6 +9,7 @@ import SessionLayout from "./layouts/session/session-layout";
 const LoginPage = lazy(() => import("./pages/auth/login/login-page"));
 
 const HomePage = lazy(() => import("./pages/session/home/home-page"));
+const SpendingPage = lazy(() => import("./pages/session/spending/spending-page"));
 
 import { Exchange } from "./pages/Exchange";
 import { Home } from "./pages/Home";
@@ -34,6 +35,7 @@ export default function AppRouter() {
 
                 <Route path="/session" element={<SessionProvider children={<SessionLayout />} />}>
                     <Route path="home" element={<HomePage />} />
+                    <Route path="spending" element={<SpendingPage />} />
                 </Route>
 
                 <Route path="/app" element={<Outlet />}>

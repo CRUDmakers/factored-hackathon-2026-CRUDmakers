@@ -269,50 +269,100 @@ export async function getReport(customerId: string, opts: { from?: string; to?: 
   };
 }
 
-/** Feature 7: gastos por categoria, com participação e evolução mensal (controle financeiro). */
-export async function getSpending(customerId: string, opts: { from?: string; to?: string }) {
+/**
+ * Feature 7: gastos por categoria, por mês (com variação mês a mês) e por produto/cartão (controle financeiro).
+ * Sem `from`, o período são `months` meses-calendário inteiros até `to`, para a tendência comparar meses cheios.
+ * `product_id` filtra totais, categorias e meses; `by_product` sempre traz todos os produtos, para comparar.
+ */
+export async function getSpending(
+  customerId: string,
+  opts: { from?: string; to?: string; months?: number; product_id?: string },
+) {
   await assertCustomer(customerId);
-  const period = await resolvePeriod(customerId, opts.from, opts.to, 90);
-  const rows = await prisma.$queryRaw<{ month: string; category: string; count: number; total_usd: Decimal }[]>`
+  const resolved = await resolvePeriod(customerId, opts.from, opts.to);
+  const period = { from: opts.from ?? firstDayMonthsBack(resolved.to, opts.months ?? 3), to: resolved.to };
+  const rows = await prisma.$queryRaw<
+    { month: string; category: string; product_id: string | null; product_type: string | null; product_number: string | null; count: number; total_usd: Decimal }[]
+  >`
     ${periodTx(customerId, period)}
-    SELECT to_char(transaction_date, 'YYYY-MM') AS month, category, count(*)::int AS count,
-           coalesce(sum(usd), 0) AS total_usd
-      FROM tx
-     WHERE transaction_status = 'Approved' AND transaction_type = ANY(${OUTFLOW_TYPES})
-     GROUP BY 1, 2
-     ORDER BY 1, 2`;
+    SELECT to_char(tx.transaction_date, 'YYYY-MM') AS month, tx.category, tx.product_id, p.product_type, p.product_number,
+           count(*)::int AS count, coalesce(sum(tx.usd), 0) AS total_usd
+      FROM tx LEFT JOIN products p ON p.product_id = tx.product_id
+     WHERE tx.transaction_status = 'Approved' AND tx.transaction_type = ANY(${OUTFLOW_TYPES})
+     GROUP BY 1, 2, 3, 4, 5
+     ORDER BY 1, 2, 3`;
 
-  const total = rows.reduce((sum, r) => sum + r.total_usd.toNumber(), 0);
-  const months = [...new Set(rows.map((r) => r.month))];
-  const monthCount = Math.max(months.length, 1);
-  const categories = [...new Set(rows.map((r) => r.category))].map((category) => {
-    const own = rows.filter((r) => r.category === category);
-    const usd = own.reduce((sum, r) => sum + r.total_usd.toNumber(), 0);
+  const usd = (rs: typeof rows) => rs.reduce((sum, r) => sum + r.total_usd.toNumber(), 0);
+  const own = opts.product_id ? rows.filter((r) => r.product_id === opts.product_id) : rows;
+  const total = usd(own);
+  const allTotal = usd(rows);
+  const months = monthsBetween(period.from, period.to);
+  const perMonth = (rs: typeof rows) => months.map((month) => round(usd(rs.filter((r) => r.month === month))));
+
+  const categories = [...new Set(own.map((r) => r.category))].map((category) => {
+    const cat = own.filter((r) => r.category === category);
+    const sum = usd(cat);
     return {
       category,
-      count: own.reduce((sum, r) => sum + r.count, 0),
-      total_usd: round(usd),
-      share_pct: round((usd / total) * 100),
-      monthly_average_usd: round(usd / monthCount),
+      count: cat.reduce((n, r) => n + r.count, 0),
+      total_usd: round(sum),
+      share_pct: round((sum / total) * 100),
+      monthly_average_usd: round(sum / months.length),
+    };
+  });
+
+  const monthTotals = perMonth(own);
+  const products = [...new Set(rows.map((r) => r.product_id))].map((productId) => {
+    const prod = rows.filter((r) => r.product_id === productId);
+    const sum = usd(prod);
+    const totals = perMonth(prod);
+    return {
+      product_id: productId,
+      product_type: prod[0].product_type,
+      product_number: prod[0].product_number,
+      total_usd: round(sum),
+      share_pct: round((sum / allTotal) * 100),
+      by_month: months.map((month, i) => ({ month, total_usd: totals[i] })),
     };
   });
 
   return {
     customer_id: customerId,
     period,
+    product_id: opts.product_id ?? null,
     currency: 'USD',
     total_spent_usd: round(total),
-    monthly_average_usd: round(total / monthCount),
+    monthly_average_usd: round(total / months.length),
     by_category: categories.sort((a, b) => b.total_usd - a.total_usd),
-    by_month: months.map((month) => {
-      const own = rows.filter((r) => r.month === month);
+    by_month: months.map((month, i) => {
+      const prev = monthTotals[i - 1];
       return {
         month,
-        total_usd: round(own.reduce((sum, r) => sum + r.total_usd.toNumber(), 0)),
-        categories: Object.fromEntries(own.map((r) => [r.category, r.total_usd])),
+        total_usd: monthTotals[i],
+        change_pct: prev ? round(((monthTotals[i] - prev) / prev) * 100) : null,
+        categories: Object.fromEntries(own.filter((r) => r.month === month).map((r) => [r.category, r.total_usd])),
       };
     }),
+    by_product: products.sort((a, b) => b.total_usd - a.total_usd),
   };
+}
+
+/** Primeiro dia do mês, `months - 1` meses antes do mês de `day` (YYYY-MM-DD). */
+function firstDayMonthsBack(day: string, months: number) {
+  const d = new Date(`${day.slice(0, 7)}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() - (months - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Meses "YYYY-MM" de `from` a `to`, inclusive (meses sem gasto entram com zero). */
+function monthsBetween(from: string, to: string) {
+  const out: string[] = [];
+  const d = new Date(`${from.slice(0, 7)}-01T00:00:00Z`);
+  while (d.toISOString().slice(0, 7) <= to.slice(0, 7)) {
+    out.push(d.toISOString().slice(0, 7));
+    d.setUTCMonth(d.getUTCMonth() + 1);
+  }
+  return out;
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;

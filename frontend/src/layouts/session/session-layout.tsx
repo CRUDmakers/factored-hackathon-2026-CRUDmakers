@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { BookOpen, House, LogOut } from "lucide-react";
+import { BookOpen, ChartPie, House, LogOut } from "lucide-react";
 import { cn } from "cn";
 import { AssistantAvatar, useAssistant } from "@/components/assistant/assistant";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -38,6 +38,12 @@ export default function SessionLayout() {
                     >
                         <House className="size-4" /> {t("nav.home")}
                     </NavLink>
+                    <NavLink
+                        to="/session/spending"
+                        className={({ isActive }) => cn(item, isActive ? "bg-primary/10 text-primary" : idle)}
+                    >
+                        <ChartPie className="size-4" /> {t("nav.spending")}
+                    </NavLink>
                     <button type="button" className={cn(item, idle)} onClick={() => assistant.open()}>
                         <AssistantAvatar className="size-4 ring-0 [&_svg]:size-2.5" /> {t("nav.assistant")}
                     </button>
@@ -69,6 +75,21 @@ export default function SessionLayout() {
             <header className="bg-sidebar flex items-center gap-3 border-b px-4 py-3 lg:hidden">
                 <Brand />
                 <div className="ms-auto flex items-center gap-2">
+                    {[
+                        { to: "/session/home", icon: House, label: t("nav.home") },
+                        { to: "/session/spending", icon: ChartPie, label: t("nav.spending") },
+                    ].map(({ to, icon: Icon, label }) => (
+                        <NavLink
+                            key={to}
+                            to={to}
+                            aria-label={label}
+                            className={({ isActive }) =>
+                                cn("rounded-lg p-2", isActive ? "bg-primary/10 text-primary" : "text-muted-foreground")
+                            }
+                        >
+                            <Icon className="size-4" />
+                        </NavLink>
+                    ))}
                     <LanguageSwitch />
                     <button
                         type="button"
