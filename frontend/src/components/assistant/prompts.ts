@@ -3,6 +3,7 @@ import {
     BadgeDollarSign,
     CalendarClock,
     CreditCard,
+    FileDown,
     HandCoins,
     Headset,
     Receipt,
@@ -13,7 +14,17 @@ import type { LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import useSession from "@/contexts/session/use-session";
 
-export type PromptKey = "balances" | "recurring" | "cardDue" | "lastTx" | "payCard" | "transfer" | "convert" | "declined" | "agent";
+export type PromptKey =
+    | "balances"
+    | "recurring"
+    | "cardDue"
+    | "lastTx"
+    | "statementPdf"
+    | "payCard"
+    | "transfer"
+    | "convert"
+    | "declined"
+    | "agent";
 
 export type Prompt = {
     /** "spending": built on the spending page from the period, card and category on screen. */
@@ -55,6 +66,7 @@ export function useSuggestedPrompts(): Prompt[] {
         make("recurring", CalendarClock, true),
         cardNo && make("cardDue", CreditCard, true, { card: cardNo }),
         make("lastTx", Receipt, true),
+        make("statementPdf", FileDown, true),
         cardNo && account && make("payCard", HandCoins, false, { card: cardNo, account, currency: card.currency }),
         account && account2 && make("transfer", ArrowLeftRight, false, { account, account2, currency: first.currency }),
         make("convert", BadgeDollarSign, true, { currency: local }),

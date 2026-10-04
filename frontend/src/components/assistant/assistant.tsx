@@ -490,11 +490,16 @@ function Message({ bubble }: { bubble: Bubble }) {
     );
 }
 
-/** A file the assistant generated (Excel or CSV): one click downloads it with the session's token. */
+/** A file the assistant generated (Excel, CSV or a PDF report): one click downloads it with the session's token. */
 function FileCard({ file }: { file: ChatFile }) {
     const { t } = useTranslation();
     const [state, setState] = useState<"idle" | "busy" | "error">("idle");
     const Icon = file.format === "xlsx" ? FileSpreadsheet : FileText;
+    const tone = {
+        xlsx: "bg-emerald-50 text-emerald-700",
+        csv: "bg-primary/10 text-primary",
+        pdf: "bg-red-50 text-red-700",
+    }[file.format];
 
     const download = async () => {
         setState("busy");
@@ -517,17 +522,15 @@ function FileCard({ file }: { file: ChatFile }) {
                 className="bg-background hover:border-primary/50 hover:bg-primary/5 group flex items-center gap-2.5 rounded-xl border px-3 py-2 text-start shadow-sm transition disabled:opacity-60"
             >
                 <span
-                    className={cn(
-                        "rounded-lg p-1.5",
-                        file.format === "xlsx" ? "bg-emerald-50 text-emerald-700" : "bg-primary/10 text-primary"
-                    )}
+                    className={cn("rounded-lg p-1.5", tone)}
                 >
                     <Icon className="size-5" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-medium">{file.filename}</span>
                     <span className="text-muted-foreground text-xs">
-                        {file.format.toUpperCase()} · {t("assistant.fileRows", { count: file.rows })} ·{" "}
+                        {file.format.toUpperCase()} ·{" "}
+                        {file.format !== "pdf" && <>{t("assistant.fileRows", { count: file.rows })} · </>}
                         {formatSize(file.size_bytes)}
                     </span>
                 </span>

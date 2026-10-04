@@ -60,6 +60,8 @@ class ToolContext:
     files: FileStore | None = None
     conversation_id: str | None = None
     file_ttl: timedelta = timedelta(hours=24)
+    # The conversation's language: generate_report writes its PDF in it.
+    language: Literal["es", "pt"] = "es"
 
 
 @dataclass(frozen=True)

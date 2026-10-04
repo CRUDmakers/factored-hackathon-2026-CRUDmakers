@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ai_backend.files.models import MAX_FILES, FileSpec
 from ai_backend.observability.tracing import TraceEvent
+from ai_backend.reports.models import ReportLang, ReportType
 
 
 class Check(BaseModel):
@@ -57,7 +59,7 @@ class HandoffRef(BaseModel):
 class FileRef(BaseModel):
     file_id: str
     filename: str
-    format: Literal["xlsx", "csv"]
+    format: Literal["xlsx", "csv", "pdf"]
     media_type: str
     size_bytes: int
     rows: int
@@ -103,3 +105,31 @@ class FilesRequest(BaseModel):
 
 class FilesResponse(BaseModel):
     files: list[FileRef]
+
+
+class ReportRequest(BaseModel):
+    """`POST /v1/reports/{report}`: the `generate_report` tool's parameters, plus the language
+    and an optional conversation the customer owns. Each report uses only its own parameters
+    (`GET /v1/reports`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    conversation_id: str | None = None
+    language: ReportLang = "es"
+    date_from: date | None = None
+    date_to: date | None = None
+    months: int | None = Field(default=None, ge=1, le=12)
+    product_id: str | None = Field(default=None, pattern=r"^PRD-")
+    transaction_id: str | None = None
+
+
+class ReportCatalogItem(BaseModel):
+    report: ReportType
+    title: dict[str, str]
+    description: str
+    parameters: list[str]
+    endpoint: str
+
+
+class ReportCatalogResponse(BaseModel):
+    reports: list[ReportCatalogItem]

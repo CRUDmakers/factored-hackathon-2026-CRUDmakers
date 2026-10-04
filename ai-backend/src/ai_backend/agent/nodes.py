@@ -412,6 +412,7 @@ async def run_tools(state: AgentState, runtime: Runtime[AgentContext]) -> dict[s
         files=ctx.files,
         conversation_id=ctx.tracer.conversation_id,
         file_ttl=ctx.file_ttl,
+        language="pt" if state.get("language") == "pt" else "es",
     )
     results = await asyncio.gather(*(_run_one(ctx, tool_ctx, call) for call in calls))
 

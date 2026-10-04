@@ -13,6 +13,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, model_validator
 
 FileFormat = Literal["xlsx", "csv"]
+# What can be stored and downloaded: the spreadsheets above plus the PDF reports (`reports/`).
+StoredFormat = Literal["xlsx", "csv", "pdf"]
 ColumnType = Literal["text", "number", "money", "date"]
 # A cell as the model writes it. One JSON-schema type list (not anyOf), so the tool schema
 # stays simple; `number` columns also accept numbers written as text ("1,234.50" is not one).
@@ -30,6 +32,7 @@ MAX_CELL_TEXT = 1000
 MEDIA_TYPES: dict[str, str] = {
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "csv": "text/csv; charset=utf-8",
+    "pdf": "application/pdf",
 }
 _UNSAFE_NAME = re.compile(r'[\\/:*?"<>|\x00-\x1f]+')
 _SHEET_FORBIDDEN = re.compile(r"[\[\]:*?/\\]")
@@ -106,10 +109,10 @@ class StoredFile(_Model):
     customer_id: str
     conversation_id: str | None
     filename: str
-    format: FileFormat
+    format: StoredFormat
     media_type: str
     size_bytes: int
-    rows: int
+    rows: int  # data rows (spreadsheets) or records listed (PDF reports)
     created_at: datetime
     expires_at: datetime
     content: bytes = Field(repr=False)

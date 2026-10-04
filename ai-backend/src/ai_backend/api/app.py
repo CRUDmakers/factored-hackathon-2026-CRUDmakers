@@ -40,9 +40,12 @@ from ai_backend.api.schemas import (
     FilesResponse,
     HealthResponse,
     LoginRequiredResponse,
+    ReportCatalogItem,
+    ReportCatalogResponse,
+    ReportRequest,
     TraceResponse,
 )
-from ai_backend.bank.client import BankClient, BankError, BankUnavailable
+from ai_backend.bank.client import BankClient, BankError, BankRejected, BankUnavailable, NotFound
 from ai_backend.bank.fake_client import FakeBankClient
 from ai_backend.bank.http_client import HttpBankClient
 from ai_backend.config import (
@@ -63,6 +66,7 @@ from ai_backend.handoff.models import Handoff
 from ai_backend.handoff.store import HandoffStore, MemoryHandoffStore, SqliteHandoffStore
 from ai_backend.llm.registry import ModelNotConfigured, build_chat_model
 from ai_backend.observability.store import MemoryTraceStore, SqliteTraceStore, TraceStore
+from ai_backend.reports.models import CATALOG, ReportArgs, ReportType, ReportUnavailable
 from ai_backend.settings import Settings, get_settings
 from ai_backend.storage import ConversationLock, InProcessLock
 from ai_backend.tools.registry import REGISTRY, tool_schemas
@@ -370,6 +374,65 @@ def create_app(
         except ConversationNotFound:
             return _error(404, "conversation_not_found", "No such conversation.")
         return FilesResponse(files=[f.ref() for f in stored])
+
+    @app.get("/v1/reports", response_model=ReportCatalogResponse)
+    async def list_reports() -> ReportCatalogResponse:
+        """The PDF reports that can be generated, with the parameters each one takes."""
+        return ReportCatalogResponse(
+            reports=[
+                ReportCatalogItem(
+                    report=r.report,
+                    title=dict(r.title),
+                    description=r.description,
+                    parameters=list(r.parameters),
+                    endpoint=f"/v1/reports/{r.report}",
+                )
+                for r in CATALOG
+            ]
+        )
+
+    @app.post(
+        "/v1/reports/{report}",
+        response_model=FilesResponse,
+        status_code=201,
+        responses={
+            401: {"model": LoginRequiredResponse},
+            404: {"model": ErrorResponse},
+            422: {"model": ErrorResponse},
+        },
+    )
+    async def create_report(
+        report: ReportType,
+        body: ReportRequest,
+        request: Request,
+        authorization: str | None = Header(default=None),
+    ) -> Any:
+        """Build a PDF report from a fixed template, the same one the assistant's
+        `generate_report` tool uses; the data comes from the bank, not from the request."""
+        state: AppState = request.app.state.ai
+        if state.service is None:
+            return _error(503, "model_unavailable", "The assistant model is not configured.")
+        params = body.model_dump(exclude={"conversation_id", "language"}, exclude_none=True)
+        try:
+            args = ReportArgs(report=report, **params)
+            stored = await state.service.create_report(
+                _bearer(authorization), args, body.language, body.conversation_id
+            )
+        except LoginRequired:
+            return _login_required()
+        except ConversationNotFound:
+            return _error(404, "conversation_not_found", "No such conversation.")
+        except NotFound:
+            return _error(404, "not_found", "No such account, card or transaction.")
+        except ReportUnavailable as exc:
+            return _error(422, exc.code, exc.message)
+        except BankRejected as exc:
+            return _error(422, exc.code, exc.message)
+        except BankUnavailable:
+            return _error(503, "bank_unavailable", "The bank could not answer right now.")
+        except ValueError as exc:  # pydantic's ValidationError included
+            return _error(422, "invalid_arguments", str(exc)[:300])
+        return FilesResponse(files=[stored.ref()])
 
     @app.get(
         "/v1/files/{file_id}",

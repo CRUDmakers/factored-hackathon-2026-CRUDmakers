@@ -408,11 +408,11 @@ export interface ChatRequest {
   confirmation?: { action_id: string; decision: 'approve' | 'reject' };
 }
 
-/** Planilha gerada pelo assistente; baixe com `downloadChatFile`. */
+/** Arquivo gerado pelo assistente (planilha ou relatório PDF); baixe com `downloadChatFile`. */
 export interface ChatFile {
   file_id: string;
   filename: string;
-  format: 'xlsx' | 'csv';
+  format: 'xlsx' | 'csv' | 'pdf';
   media_type: string;
   size_bytes: number;
   rows: number;

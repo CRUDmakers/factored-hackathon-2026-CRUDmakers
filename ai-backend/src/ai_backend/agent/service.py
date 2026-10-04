@@ -31,6 +31,8 @@ from ai_backend.handoff.models import Handoff
 from ai_backend.handoff.store import HandoffStore
 from ai_backend.observability.store import TraceStore
 from ai_backend.observability.tracing import TraceEvent, Tracer
+from ai_backend.reports import service as reports_service
+from ai_backend.reports.models import ReportArgs, ReportLang
 from ai_backend.storage import ConversationLock, InProcessLock
 from ai_backend.tools.definitions import ToolSpec
 
@@ -224,6 +226,33 @@ class ChatService:
             now=datetime.now(UTC),
             ttl=self.file_ttl,
         )
+
+    async def create_report(
+        self,
+        token: str | None,
+        args: ReportArgs,
+        lang: ReportLang,
+        conversation_id: str | None = None,
+    ) -> StoredFile:
+        """The same PDF the `generate_report` tool builds, requested directly. Bank errors
+        (`NotFound`, `BankUnavailable`) and `ReportUnavailable` propagate."""
+        session = await self.authenticate(token)
+        if conversation_id is not None:
+            await self.owned_conversation(session, conversation_id)
+        try:
+            return await reports_service.generate(
+                self.files,
+                self.bank,
+                session,
+                args,
+                lang=lang,
+                conversation_id=conversation_id,
+                today=self.clock().date(),
+                now=datetime.now(UTC),
+                ttl=self.file_ttl,
+            )
+        except AuthExpired as exc:
+            raise LoginRequired() from exc
 
     async def file(self, token: str | None, file_id: str) -> StoredFile:
         session = await self.authenticate(token)

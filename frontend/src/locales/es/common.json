@@ -89,6 +89,10 @@
                 "label": "Últimos movimientos",
                 "text": "¿Cuáles fueron mis últimas 5 transacciones?"
             },
+            "statementPdf": {
+                "label": "Extracto en PDF",
+                "text": "Quiero el extracto de los últimos 30 días en PDF"
+            },
             "payCard": {
                 "label": "Pagar la tarjeta",
                 "text": "Quiero pagar 100 {{currency}} de la tarjeta terminada en {{card}} con la cuenta terminada en {{account}}"

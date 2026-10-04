@@ -40,7 +40,7 @@ type ChatResponse = {
 type ChatFile = {
   file_id: string;
   filename: string;                    // e.g. "movimientos_junio.xlsx"
-  format: "xlsx" | "csv";
+  format: "xlsx" | "csv" | "pdf";
   media_type: string;
   size_bytes: number;
   rows: number;                        // data rows, all sheets
@@ -162,6 +162,32 @@ The same JSON is the `generate_files` tool's arguments and the body of `POST /v1
 
 xlsx files get a styled, frozen header row, a filter and column widths. csv files are UTF-8 with BOM (Excel shows accents) and comma-separated. Text that a spreadsheet would run as a formula (`=`, `+`, `-`, `@`) is always written as text.
 
+## PDF reports
+
+PDFs are not free-form: there is a fixed set of templates (`src/ai_backend/reports/`). When the customer asks for one ("quero o extrato de junho em PDF", "mándame el comprobante de esa transferencia"), the agent calls `generate_report` with only the report's name and parameters. The backend reads the data from the bank with the customer's session, lays it out in the conversation's language (es/pt) and returns the file in `ChatResponse.files`, like a spreadsheet (`format: "pdf"`, `media_type: "application/pdf"`; `rows` is the number of records listed). The download is the same `GET /v1/files/{file_id}`.
+
+| `report` | Parameters | Content |
+|---|---|---|
+| `account_statement` | `date_from`, `date_to`, `product_id` (all optional) | Transactions of the period, oldest first; inflows/outflows/net per currency (approved only). Default: the last 30 days. At most 500 transactions (the newest; the PDF says so). |
+| `balances` | none | Accounts, credit cards and loans with their balances today, and totals per currency. |
+| `spending` | `date_from`, `date_to`, `months` (1–12), `product_id` | Spending in USD: total, monthly average, bars and table by category, by month (with change), by card or account. Default: the last 3 calendar months. |
+| `recurring_payments` | none | Recurring payments expected this month: paid, scheduled or due (overdue marked), with the total still due. |
+| `transaction_receipt` | `transaction_id` (required) | Receipt of one transaction: amount, status (and decline reason), date, channel, product, counterparty, place. Refused (`under_review`) for a transaction flagged as fraud. |
+
+Card and account numbers show only their last 4 digits; internal IDs (`PRD-…`) never appear. The footer has the customer ID, the issue time and "page X of Y".
+
+The app can request the same PDFs directly, without the chat:
+
+```
+GET  /v1/reports                    → {reports: [{report, title: {es, pt}, description, parameters, endpoint}]}
+POST /v1/reports/{report}           Authorization: Bearer <access_token>
+     {"language": "pt", "date_from": "2026-06-01", "date_to": "2026-06-30", "product_id": "PRD-…",
+      "transaction_id": "TRX-…", "conversation_id": "conv_…"}      (all optional; each report uses its own)
+→ 201 {files: [ChatFile]}
+→ 401 login_required · 404 not_found (product/transaction, or another customer's) · 404 conversation_not_found
+→ 422 invalid_arguments · 422 under_review · 503 bank_unavailable
+```
+
 ## Other endpoints
 
 | Method | Path | Returns |
@@ -169,5 +195,7 @@ xlsx files get a styled, frozen header row, a filter and column widths. csv file
 | `GET` | `/v1/conversations/{conversation_id}/trace` | Every step of the conversation (nodes, tools, policy decisions, tokens, timings), for the human-agent panel and the demo. Only the conversation's customer. |
 | `GET` | `/v1/handoffs/{handoff_id}` | The handoff record: reason codes, priority, verified facts, actions taken, evidence, the model's summary and open questions (ARCHITECTURE §10). Only the handoff's customer, until agent roles exist. |
 | `POST` | `/v1/files` | Builds files from the payload above, for the session's customer. |
-| `GET` | `/v1/files/{file_id}` | A generated file (see above). |
+| `GET` | `/v1/files/{file_id}` | A generated file or PDF report (see above). |
+| `GET` | `/v1/reports` | The PDF report catalogue (see above). |
+| `POST` | `/v1/reports/{report}` | Builds one PDF report from the bank's data, for the session's customer. |
 | `GET` | `/v1/health` | `{status: "ok" \| "degraded", checks: {models, bank, storage}}`; 503 when degraded. |

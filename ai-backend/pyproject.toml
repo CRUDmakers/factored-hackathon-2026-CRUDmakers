@@ -32,6 +32,8 @@ dependencies = [
     "numpy==2.4.6",
     # Excel files the assistant generates for download (generate_files, /v1/files)
     "openpyxl==3.1.5",
+    # PDF reports the assistant generates from fixed templates (generate_report, /v1/reports)
+    "reportlab==4.5.1",
 ]
 
 [project.optional-dependencies]

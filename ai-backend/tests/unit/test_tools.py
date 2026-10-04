@@ -28,7 +28,7 @@ def test_every_p0_tool_is_registered():
         "convert_currency": "read", "transfer_money": "write", "pay_bill": "write",
         "handoff_to_human": "escalate", "generate_files": "read",
         "get_recurring_payments": "read", "pay_recurring_payments": "write",
-        "get_spending_summary": "read",
+        "get_spending_summary": "read", "generate_report": "read",
     }
 
 
