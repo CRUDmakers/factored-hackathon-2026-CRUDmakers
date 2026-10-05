@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banking}
       POSTGRES_DB: banking
     ports:
-      - "${DB_PORT:-5432}:5432"
+      - "${DB_PORT:-11100}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/docker/initdb:/docker-entrypoint-initdb.d:ro
@@ -45,7 +45,7 @@ services:
       AUTH_SESSION_TTL_SECONDS: ${AUTH_SESSION_TTL_SECONDS:-900}
       LOG_LEVEL: ${API_LOG_LEVEL:-info}
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_PORT:-11101}:3000"
     depends_on:
       etl:
         condition: service_completed_successfully
@@ -69,11 +69,11 @@ services:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: http://localhost:${API_PORT:-3000}
+        VITE_API_URL: http://localhost:${API_PORT:-11101}
         VITE_SERVICE_KEY: ${AUTH_SERVICE_KEY:?defina AUTH_SERVICE_KEY no .env}
-        VITE_AI_URL: http://localhost:${AI_PORT:-8000}
+        VITE_AI_URL: http://localhost:${AI_PORT:-11103}
     ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      - "${FRONTEND_PORT:-11102}:80"
     depends_on:
       - api
       - ai-backend
@@ -92,13 +92,13 @@ services:
       BANK_MODE: http
       BANK_BASE_URL: http://api:3000
       DB_URL: postgresql://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-banking}@db:5432/ai_backend
-      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-5173}
+      CORS_ORIGINS: http://localhost:${FRONTEND_PORT:-11102}
       TRACE_RETENTION_DAYS: ${TRACE_RETENTION_DAYS:-30}
       LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "${AI_PORT:-8000}:8000"
+      - "${AI_PORT:-11103}:8000"
     depends_on:
       db:
         condition: service_healthy
