@@ -63,6 +63,20 @@ describe('emissão de sessão de teste', () => {
 
     expect((await issue('abc')).statusCode).toBe(400);
   });
+
+  it('com lista de clientes liberados, recusa quem está fora dela antes de olhar o banco', async () => {
+    config.authAllowedCustomers = [ANA];
+    try {
+      expect((await issue(ANA)).statusCode).toBe(201);
+      for (const id of [BRUNO, UNKNOWN]) {
+        const res = await issue(id);
+        expect(res.statusCode).toBe(403);
+        expect(res.json()).toMatchObject({ error: 'customer_not_allowed' });
+      }
+    } finally {
+      config.authAllowedCustomers = [];
+    }
+  });
 });
 
 describe('rotas do cliente exigem sessão', () => {

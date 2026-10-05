@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const KEYS = [
   'HOST', 'PORT', 'DATABASE_URL', 'DATA_DIR', 'SCHEDULER_INTERVAL_MS', 'LOG_LEVEL',
-  'NODE_ENV', 'AUTH_JWT_SECRET', 'AUTH_SERVICE_KEY', 'AUTH_SESSION_TTL_SECONDS',
+  'NODE_ENV', 'AUTH_JWT_SECRET', 'AUTH_SERVICE_KEY', 'AUTH_SESSION_TTL_SECONDS', 'AUTH_ALLOWED_CUSTOMERS',
 ] as const;
 const original = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 
@@ -31,6 +31,7 @@ describe('config', () => {
       AUTH_JWT_SECRET: 'segredo',
       AUTH_SERVICE_KEY: 'chave',
       AUTH_SESSION_TTL_SECONDS: '60',
+      AUTH_ALLOWED_CUSTOMERS: 'CLI-A, CLI-B,',
     });
     expect(await freshConfig()).toEqual({
       host: '127.0.0.1',
@@ -42,6 +43,7 @@ describe('config', () => {
       authJwtSecret: 'segredo',
       authServiceKey: 'chave',
       authSessionTtlSeconds: 60,
+      authAllowedCustomers: ['CLI-A', 'CLI-B'],
     });
   });
 
@@ -57,6 +59,7 @@ describe('config', () => {
       authJwtSecret: 'dev-only-jwt-secret-troque-em-producao',
       authServiceKey: 'dev-service-key',
       authSessionTtlSeconds: 900,
+      authAllowedCustomers: [],
     });
   });
 

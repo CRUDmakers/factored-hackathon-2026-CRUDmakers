@@ -11,4 +11,7 @@ export const config = {
   authJwtSecret: process.env.AUTH_JWT_SECRET ?? (dev ? 'dev-only-jwt-secret-troque-em-producao' : ''),
   authServiceKey: process.env.AUTH_SERVICE_KEY ?? (dev ? 'dev-service-key' : ''),
   authSessionTtlSeconds: Number(process.env.AUTH_SESSION_TTL_SECONDS ?? 900),
+  // Clientes que podem receber sessão de teste (IDs separados por vírgula). Vazio = todos (dev e testes).
+  // Na demo pública a chave de serviço vai no bundle do frontend, então só os clientes da demo entram.
+  authAllowedCustomers: (process.env.AUTH_ALLOWED_CUSTOMERS ?? '').split(',').map((id) => id.trim()).filter(Boolean),
 };

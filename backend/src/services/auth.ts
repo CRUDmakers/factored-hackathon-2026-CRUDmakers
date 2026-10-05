@@ -74,6 +74,10 @@ export function assertServiceKey(value: unknown): void {
 }
 
 export async function issueTestSession(customerId: string) {
+  // Antes da consulta ao banco, para não revelar se um cliente fora da lista existe.
+  if (config.authAllowedCustomers.length > 0 && !config.authAllowedCustomers.includes(customerId)) {
+    throw new AppError(403, 'customer_not_allowed', `Cliente ${customerId} não está liberado nesta demo.`);
+  }
   const customer = await prisma.customer.findUnique({ where: { customer_id: customerId }, select: { customer_status: true } });
   if (!customer) throw notFound('Cliente', customerId);
   if (customer.customer_status !== 'Active') {

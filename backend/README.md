@@ -55,12 +55,13 @@ O Studio usa o `DATABASE_URL`. Com o Postgres do `docker compose`, o padrão (`l
 | `AUTH_JWT_SECRET` | só fora de produção: `dev-only-jwt-secret-troque-em-producao` | segredo HMAC (HS256) dos tokens de sessão |
 | `AUTH_SERVICE_KEY` | só fora de produção: `dev-service-key` | chave do provedor de identidade de teste e das operações internas (header `x-service-key`) |
 | `AUTH_SESSION_TTL_SECONDS` | `900` (15 min) | validade do token de sessão |
+| `AUTH_ALLOWED_CUSTOMERS` | vazio (todos); no `docker-compose.yml`, os 5 clientes da demo | clientes que podem receber sessão de teste, separados por vírgula |
 
 Com `NODE_ENV=production` (caso da imagem Docker) não há valor padrão para `AUTH_JWT_SECRET` e `AUTH_SERVICE_KEY`: a API não sobe sem eles. O `docker-compose.yml` passa valores de demo, que podem ser sobrescritos por variáveis de ambiente ou por um `.env` na raiz.
 
 ## Autenticação
 
-> **Serviço de identidade simulado.** Não existe login real (senha, OTP, biometria). `POST /auth/test-sessions` faz o papel de um provedor de identidade confiável: quem tem a chave de serviço (o frontend/demo) afirma que já verificou o cliente, e a API emite a sessão. Um número de documento ou `customer_id` sozinho não prova identidade; o que dá acesso é o token assinado.
+> **Serviço de identidade simulado.** Não existe login real (senha, OTP, biometria). `POST /auth/test-sessions` faz o papel de um provedor de identidade confiável: quem tem a chave de serviço (o frontend/demo) afirma que já verificou o cliente, e a API emite a sessão. Um número de documento ou `customer_id` sozinho não prova identidade; o que dá acesso é o token assinado. Como a chave de serviço vai no bundle público do frontend, a demo implantada só emite sessão para os clientes de `AUTH_ALLOWED_CUSTOMERS`.
 
 1. O frontend/demo pede uma sessão para um cliente ativo, com a chave de serviço:
 
@@ -89,6 +90,7 @@ O token é um JWT HS256 com `iss = banking-cs-test-idp`, `sub = customer_id`, `j
 | Token de um cliente acessando outro `customerId` (exista ele ou não) | 403 | `forbidden` |
 | Chave de serviço ausente ou errada (`/auth/test-sessions`, `/api/scheduled-payments/run`) | 401 | `unauthorized` |
 | Emissão para cliente inativo | 403 | `customer_inactive` |
+| Emissão para cliente fora de `AUTH_ALLOWED_CUSTOMERS` (checado antes do banco, então não revela se o cliente existe) | 403 | `customer_not_allowed` |
 
 Continuam públicos: `/health`, `/api/reference`, `/api/exchange-rates/*` e `/docs`. `POST /api/scheduled-payments/run` é operação interna e exige `x-service-key`. No Swagger, use o botão **Authorize** (esquemas `bearerAuth` e `serviceKey`).
 
