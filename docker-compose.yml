@@ -3,6 +3,7 @@
 name: banking-cs-ai
 services:
   db:
+    restart: unless-stopped
     image: postgres:17-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-banking}
@@ -22,6 +23,7 @@ services:
   # API do banco (Swagger em http://localhost:${API_PORT}/docs).
   # Roda com NODE_ENV=production: sem AUTH_JWT_SECRET e AUTH_SERVICE_KEY ela não sobe.
   api:
+    restart: unless-stopped
     build: ./backend
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-banking}@db:5432/banking
@@ -50,6 +52,7 @@ services:
   # O nginx do frontend faz proxy de /api -> api e /ai -> ai-backend, então o bundle usa caminhos
   # relativos e funciona acessando de qualquer máquina (http://<ip-do-servidor>:${FRONTEND_PORT}).
   frontend:
+    restart: unless-stopped
     build:
       context: ./frontend
       args:
@@ -66,6 +69,7 @@ services:
   # - Cria o próprio banco `ai_backend` neste Postgres ao subir (conversas, checkpoints, traces, handoffs).
   # - Não guarda o segredo JWT nem a chave de serviço: valida cada sessão na API (GET /auth/sessions/current).
   ai-backend:
+    restart: unless-stopped
     build: ./ai-backend
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
