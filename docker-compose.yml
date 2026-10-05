@@ -20,6 +20,21 @@ services:
       timeout: 5s
       retries: 20
 
+  # Aplica as migrações e carrega os CSVs de ./data (incremental: só arquivos cujo sha256 mudou).
+  # Sob demanda, fora do `up`, porque falha sem CSVs em ./data: docker compose run --rm etl
+  etl:
+    build: ./backend
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/etl/cli.js"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-banking}:${POSTGRES_PASSWORD:-banking}@db:5432/banking
+      DATA_DIR: /data
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["etl"]
+
   # API do banco (Swagger em http://localhost:${API_PORT}/docs).
   # Roda com NODE_ENV=production: sem AUTH_JWT_SECRET e AUTH_SERVICE_KEY ela não sobe.
   api:

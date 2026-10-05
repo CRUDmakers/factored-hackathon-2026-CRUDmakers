@@ -431,20 +431,19 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
 - **Database:** Postgres from Compose, in a separate `ai_backend` database. SQLite for tests.
 - **Session format:** Node's HS256 JWT, checked through Node (ADR-002).
 - **P0 write:** Node payments (ADR-003).
+- **Hosting:** the Docker Compose stack in the repo root (Postgres, Node API, AI backend, nginx frontend), with restart policies; the ETL runs on demand. Operations and remaining deployment work are in the root README (English summary).
 
 **Still open:**
 1. **Payment method names:** Node uses Pix and boleto, which are Brazilian. The bank operates in México (SPEI), Colombia (PSE/Bre-B) and Argentina (CVU/alias). The recommendation is to keep Node's API names internally and use generic, country-appropriate wording with customers. Pix stays P1 until this is settled.
-2. **Hosting:** the Node README mentions Render. To confirm for the AI backend.
-3. **Model providers for the final eval and the deployment.**
+2. **Model providers for the final eval and the deployment.**
    - During development, the agent and judge run on Gemini through a local 9router (`gemini-3.8-flash` as agent, `gemini-3.1-pro-low` as judge, both via the OpenAI-compatible endpoint).
    - That route can't be used for the submission:
      - Judges can't reproduce it, and the deployed service can't reach a local router.
      - The router adds about 2.1k hidden prompt tokens to every call, which distorts latency, token and cost metrics and adds instructions we don't control.
      - A retired model answered with HTTP 200 and an error message as its content, so the LLM layer must treat a response without `usage` as a provider failure.
    - M5 still ran through the router (no direct keys yet): the agent comparison is `gemini-3.8-flash` vs `gpt-oss-120b` (open-weight) vs `claude-sonnet-4-6`, judged by `gemini-3.1-pro-low`. Its token and latency numbers carry the router's overhead; cost is estimated from the tokens at each model's list price (`models.yaml`).
-   - Before the submission, choose direct providers (for example Anthropic plus `gpt-oss-120b` or another open model on a hosted endpoint) and rerun the test split with the same commands.
-4. **Owner of S3 → `./data`:** the download is manual today; Node's ETL loads from `./data`.
-5. **Submission deadline** (check the kickoff timeline).
+   - Not done before the submission: rerun the test split on direct providers (for example Anthropic plus `gpt-oss-120b` on a hosted endpoint) with the shipped prompt `system_v6`, with the same commands. Until then the numbers describe `system_v4` on the router models (root README, limitations).
+3. **Owner of S3 → `./data`:** the download is manual today; Node's ETL loads from `./data`.
 
 **Requests to the Node team** (each has a workaround until it lands):
 

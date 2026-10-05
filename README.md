@@ -10,6 +10,8 @@ Um assistente com IA que consulta saldos, explica gastos, faz pagamentos e gera 
 
 *Projeto do time **CRUDmakers** para o Factored AI & Data Hackathon 2026*
 
+**🇬🇧 For the judges:** [English summary](#-english-summary-for-the-judges) (workflow, results, limitations, setup, operations).
+
 ![Página inicial do Banco LATAM com o assistente aberto](docs/img/overview.png)
 
 </div>
@@ -111,6 +113,86 @@ Para comparação, o mesmo modelo de IA **sem** as nossas regras de segurança e
 3. Clique em **Falar com o assistente** e experimente uma das sugestões, ou escreva do seu jeito.
 
 > Todos os dados são fictícios, do dataset do Factored Datathon 2026. Nenhum dinheiro real é movimentado.
+
+---
+
+## 🇬🇧 English summary (for the judges)
+
+### Workflow
+
+One workflow: **account and payment inquiries**, including the customer's own self-service payments. Balances, transactions, decline reasons, monthly bills, statements, currency conversion and the handoff all serve that workflow; we didn't add disputes, card servicing or credit. Why this one: in the dataset's first half of 2025 there were 39,569 "Transaccional" contacts, 85% by phone, with a median wait of 118 s and a median call of 205 s ([`docs/transaccional_scope.md`](docs/transaccional_scope.md)).
+
+All three required paths are covered, in Spanish and Portuguese: **normal** (answer or pay after an explicit confirmation), **ambiguous or unsupported** (clarify or decline), and **human** (a structured handoff with the request, verified facts, actions taken and open questions). Policy runs in code, in the tool layer, not in the prompt ([architecture](ai-backend/ARCHITECTURE.md)).
+
+### Results (offline evaluation)
+
+262 held-out test scenarios × 3 repeats = 786 cases per system, graded by code, with agent model `gemini-3.8-flash` ([official report](ai-backend/eval/reports/m5-test/report.md), [after the fixes](ai-backend/eval/reports/m5-test-v2/report.md), [guide with examples](ai-backend/ASSISTANT_GUIDE.md)).
+
+| | B0 keyword bot | B1 same model, no policy engine | **S full system** |
+|---|---|---|---|
+| Safe automated resolution | 219/417 | 328/417 | **414/417 (99.3%)** |
+| Unsafe outcomes | 24/786 | 140/786 | **0/786** |
+| Missed handoffs | 114/192 | 119/192 | **4/192** |
+| Cost per case / per resolution (list-price estimate) | $0 / $0 | $0.0199 / $0.0476 | $0.0145 / $0.0275 |
+| Latency p50 / p95 per case | — | 8.8 s / 21.7 s | 8.1 s / 21.0 s |
+
+These are offline measurements on synthetic, templated scenarios, not production results. 0 unsafe outcomes in 786 cases doesn't prove zero risk.
+
+### What was not evaluated (limitations)
+
+- **The shipped prompt is newer than the measured one.** The evaluation measured prompt `system_v4`; the app runs `system_v6`. Versions 5 and 6 added four features that have **no test scenarios**: expected and recurring monthly payments ("pague tudo"), spending analysis and saving tips, Excel/CSV files, and PDF reports. They run through the same policy engine and confirmation flow, but their quality is unmeasured.
+- **The model differs from deployment.** The evaluation ran on development models through a router. Latency includes the router's overhead, and cost is an estimate (measured tokens × public list price, an upper bound).
+- **The second run is not held out.** The "after the fixes" report reruns the same test split after fixes motivated by its failures. The first run is the official result.
+- **The LLM judge is not validated.** Its scores (clarity, tone, language) have no human labels yet, so treat them as indicative. All headline numbers come from deterministic grading, not from the judge.
+- **The model comparison is partial.** `gpt-oss-120b` and `claude-sonnet-4-6` also had 0 unsafe outcomes, but the router's quota ran out mid-run.
+- **Data.** The dataset is synthetic and has no Portuguese; the call transcripts are templates; there is no status history and no credit-card statement data ([full list](ai-backend/ARCHITECTURE.md#17-known-data-limitations-to-report)). The classifier's training phrases were drafted by a language model.
+- **The workflow analysis is not scripted.** The figures in `docs/transaccional_scope.md` came from exploratory queries that aren't committed as a reproducible script.
+
+### Data provenance
+
+| Input | Kind | Where it's used |
+|---|---|---|
+| LATAM Bank dataset (Factored Datathon 2026) | Synthetic, from the organizers | Loaded into Postgres by the ETL; not committed (`data/` is gitignored) |
+| Offline fixture (80 customers) | Extract of that dataset, personal data removed | Offline bank for tests and the evaluation; rebuilt locally, not committed |
+| Test fixtures (`backend/tests/fixtures`, `ai-backend/tests/fixtures`) | Hand-written by the team | Unit, integration and ETL tests |
+| Classifier phrases (`ai-backend/classifier_data`) | Drafted by a language model, labelled by the team | Route classifier training and its held-out test |
+| Evaluation scenarios | Generated from fixture records with team-written ES/PT templates | The 262-scenario test split (frozen in `scenarios.lock.json`) |
+| Demo recurring payments (`backend/scripts/seed-marta-recurring.sql`) | Team-made | Demo of monthly payments for one customer |
+| Bank policy (`ai-backend/config/policy.yaml`) | Synthetic, team-written | Limits, confirmation and escalation rules |
+
+No real money moves: every payment runs in the simulated bank.
+
+### Run it locally
+
+```bash
+cp .env.example .env     # set AUTH_JWT_SECRET, AUTH_SERVICE_KEY and a model (below)
+# Put the organizers' CSVs in ./data: data/customers.csv, data/products.csv, ...
+# and data/transactions/year=YYYY/month=MM/day=DD/*.csv
+docker compose up -d --build db
+docker compose run --rm etl          # migrations + incremental load with the data contract
+docker compose up -d --build         # API, AI backend, frontend
+```
+
+Then open http://localhost:5173 (the bank API's Swagger is at http://localhost:3000/docs). For the model, set `ANTHROPIC_API_KEY` and `AGENT_MODEL=claude-sonnet-5` (or another key in `ai-backend/config/models.yaml`), or keep the OpenAI-compatible settings.
+
+Tests: `docker compose run --rm test` (bank API, 100% coverage) and `cd ai-backend && pip install -e ".[dev]" && pytest -q` (AI backend, offline, no model keys). Re-running the evaluation needs the offline fixture and model keys ([how](ai-backend/README.md#evaluation)).
+
+### Operations and remaining work
+
+- **Stack:** `docker-compose.yml` runs Postgres, the bank API, the AI backend and the nginx frontend, with restart policies. The ETL runs on demand and is incremental, so it can run daily.
+- **Capacity:** not load-tested. Each turn is bounded: at most 6 tool steps, a 30 s timeout per model call and 3 s per bank call. A conversation runs one turn at a time (a Postgres advisory lock), and different conversations run in parallel. The AI backend keeps its state in Postgres, so it can scale out; the limits are the model provider's rate limits and the single Postgres instance.
+- **Monitoring:** every turn writes a trace (route and confidence, policy decisions with reason codes, tool and bank calls, tokens, cost, latency, outcome) to Postgres and to JSON logs, and both backends have health endpoints. There are no dashboards or alerts yet.
+- **Access control:** short-lived signed sessions (15 min), every bank route scoped to the session's customer, tools with no identity parameters, and test sessions limited to the demo customers. Secrets live in environment variables.
+- **Retention:** conversations and traces are deleted after `TRACE_RETENTION_DAYS` (30 by default).
+- **Before production:**
+  - a real identity provider (OIDC with MFA) instead of the test-session service;
+  - idempotency keys on payment endpoints, so writes can be retried safely;
+  - alerts on handoff rate, policy blocks, provider failures and latency;
+  - a load test and per-customer rate limits;
+  - a fresh evaluation on the shipped prompt and the deployment model, with scenarios for the four unevaluated features;
+  - human labels for the LLM judge;
+  - an agent console for handoffs (today: structured JSON plus the trace endpoint);
+  - a secrets manager with key rotation, Postgres backups, and a data-processing agreement with the model provider.
 
 ---
 
