@@ -142,11 +142,29 @@ model Transaction {
   related_product_id   String?
   scheduled_payment_id String?
   balance_after        Decimal?  @db.Decimal(20, 2)
+  // Linhagem: arquivo do ETL de onde a linha veio (null nas operações simuladas)
+  source_file          String?
 
   @@index([customer_id, transaction_date(sort: Desc)])
   @@index([product_id, transaction_date(sort: Desc)])
   @@index([scheduled_payment_id])
+  @@index([source_file])
   @@map("transactions")
+}
+
+// Manifesto do ETL: um registro por arquivo carregado (linhagem, qualidade e controle incremental).
+model EtlFile {
+  file           String   @id // caminho relativo ao DATA_DIR
+  target_table   String
+  partition_date DateTime? @db.Date // partições diárias de transactions (process_date)
+  sha256         String
+  rows_read      Int
+  rows_loaded    Int
+  rows_rejected  Int
+  rejects        Json // linhas rejeitadas por motivo, ex.: {"currency": 2, "duplicate_key": 1}
+  loaded_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("etl_files")
 }
 
 model ScheduledPayment {

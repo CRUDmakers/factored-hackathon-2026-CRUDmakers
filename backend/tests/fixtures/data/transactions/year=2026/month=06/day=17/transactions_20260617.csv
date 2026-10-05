@@ -1,0 +1,7 @@
+﻿transaction_id,transaction_date,process_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,branch_id,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score,latitude,longitude
+TRX-T15,2026-06-17 18:00:00,2026-06-17,,CLI-ANA000000001,Transfer,,15.00,USD,,,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T14,2026-06-17 17:00:00,2026-06-17,PRD-ANACHK000001,CLI-ANA000000001,Withdrawal,,20.00,USD,,ATM,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T13,2026-06-17 16:00:00,2026-06-17,PRD-ANACHK000001,CLI-ANA000000001,Withdrawal,,30.00,USD,,ATM,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T16,2026-06-17 12:00:00,2026-06-17,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Shopping,40.00,USD,,Web,,Tienda Online,Shopping,México,Ciudad de México,Pending,05,False,,,
+TRX-T02,2026-06-17 10:00:00,2026-06-17,PRD-ANACHK000001,CLI-ANA000000001,Withdrawal,,100.00,USD,,ATM,SUC-T0000001,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T06,2026-06-17 09:00:00,2026-06-17,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Shopping,10.00,USD,,Web,,Tienda Online,Shopping,México,Ciudad de México,Pending,,False,,,

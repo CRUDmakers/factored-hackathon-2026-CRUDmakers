@@ -1,0 +1,3 @@
+﻿branch_id,branch_code,branch_name,branch_type,address,city,state,country,postal_code,geographic_zone,phone,email,opening_time,closing_time,has_atms,atm_count,has_teller_windows,teller_window_count,latitude,longitude,branch_opening_date,branch_status
+SUC-T0000001,T0001,Banco LATAM CDMX Centro,Premium,"Av. Reforma 100, Centro",Ciudad de México,CDMX,México,06000,Urbana,+52 55 5000 0001,t0001@test.com,09:00:00,17:00:00,True,4,True,6,19.4326,-99.1332,2000-01-01,Active
+SUC-T0000002,T0002,Banco LATAM Sin Coordenadas,Express,Calle Falsa 123,Monterrey,Nuevo León,México,64000,Urbana,+52 81 5000 0002,t0002@test.com,09:00:00,17:00:00,False,0,True,2,0.0,0.0,2010-01-01,Active

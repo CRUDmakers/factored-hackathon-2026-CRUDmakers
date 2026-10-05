@@ -1,0 +1,10 @@
+﻿transaction_id,transaction_date,process_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,branch_id,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score,latitude,longitude
+TRX-T01,2026-06-16 20:00:00,2026-06-16,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Food,50.00,USD,,POS,,Tacos El Güero,Restaurants,Mexico,Ciudad de México,Approved,00,False,2.1,19.4,-99.1
+TRX-T05,2026-06-16 15:00:00,2026-06-16,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Shopping,30.00,USD,,Web,,Tienda Online,Shopping,México,Ciudad de México,Declined,51,False,,,
+TRX-T04,2026-06-16 12:00:00,2026-06-16,PRD-ANASAV000002,CLI-ANA000000001,Transfer,,400000.00,COP,,App,,,,Colombia,Bogotá,Approved,00,False,,,
+TRX-T03,2026-06-16 09:00:00,2026-06-16,PRD-ANACHK000001,CLI-ANA000000001,Deposit,,2000.00,USD,,Branch,SUC-T0000001,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T12,2026-06-16 08:00:00,2026-06-16,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Entertainment,50.00,MXN,2.50,App,,Cine Digital,Entertainment,México,Ciudad de México,Approved,00,False,,,
+TRX-T11,2026-06-16 07:00:00,2026-06-16,PRD-ANAHIP000011,CLI-ANA000000001,Adjustment,,12.00,USD,,Branch,SUC-T0000001,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T10,2026-06-16 06:00:00,2026-06-16,PRD-ANASEG000009,CLI-ANA000000001,Adjustment,,5.00,USD,,Web,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T09,2026-06-16 05:00:00,2026-06-16,PRD-ANAINV000007,CLI-ANA000000001,Adjustment,,40.00,USD,,Web,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T08,2026-06-16 04:00:00,2026-06-16,PRD-ANALOAN00006,CLI-ANA000000001,Adjustment,,25.00,USD,,Branch,SUC-T0000002,,,México,Monterrey,Approved,00,False,,,

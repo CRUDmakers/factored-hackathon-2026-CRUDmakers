@@ -17,7 +17,7 @@ docker compose run --rm etl
 docker compose up -d api
 ```
 
-A carga (`etl`) aplica as migrações e copia os CSVs via `COPY` (4,4 mi de transações em cerca de 2 min). Ela só roda se o banco estiver vazio. Para recarregar do zero (o que apaga as operações simuladas):
+A carga (`etl`) aplica as migrações e copia os CSVs via `COPY`, validando cada linha contra o contrato de dados e gravando a linhagem em `etl_files`. É incremental: só recarrega arquivos cujo sha256 mudou (partições diárias novas ou reenviadas), então pode rodar todo dia. Detalhes, relatório de qualidade e números medidos em [`docs/data_engineering.md`](../docs/data_engineering.md). Para recarregar do zero (o que apaga as operações simuladas):
 
 ```bash
 docker compose run --rm etl sh -c "npx prisma migrate deploy && node dist/etl/cli.js --force"
@@ -135,11 +135,12 @@ src/
   auth.ts          checagem central de sessão/chave de serviço (hooks onRoute + onRequest)
   main.ts          ponto de entrada (servidor + executor de agendamentos)
   db/prisma.ts     Prisma Client (adapter pg) e pool compartilhado
-  etl/             carga dos CSVs via COPY
+  etl/             carga dos CSVs: contrato de dados, linhagem (etl_files) e carga incremental
+scripts/           quality_report.sql (relatório de qualidade, só leitura) e seed de demonstração
   routes/          rotas HTTP (schemas TypeBox → validação + Swagger)
   services/        regras de negócio
   lib/             domínio (países, produtos), erros, códigos ISO
-tests/             Vitest + fixtures CSV (mini-dataset)
+tests/             Vitest + fixtures CSV sintéticas (fixtures/data: mini-banco; fixtures/incremental: segunda entrega)
 ```
 
 A cobertura exclui apenas o código gerado pelo Prisma e os dois arquivos de entrada do processo (`src/main.ts`, `src/etl/cli.ts`), que só chamam funções já testadas.

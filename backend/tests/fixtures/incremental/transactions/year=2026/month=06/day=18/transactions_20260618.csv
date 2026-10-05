@@ -1,0 +1,7 @@
+﻿transaction_id,transaction_date,process_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,branch_id,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score,latitude,longitude
+TRX-T19,2026-06-18 10:00:00,2026-06-18,PRD-ANACHK000001,CLI-ANA000000001,Withdrawal,,40.00,USD,,ATM,,,,Mexico,Ciudad de México,Approved,00,False,,,
+TRX-T20,2026-06-19 01:30:00,2026-06-18,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Food,12.00,USD,,POS,,Tacos El Güero,Restaurants,México,Ciudad de México,Approved,00,False,,,
+TRX-BAD-CURRENCY,2026-06-18 11:00:00,2026-06-18,PRD-ANACHK000001,CLI-ANA000000001,Purchase,Food,9.00,EUR,,POS,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-BAD-AMOUNT,2026-06-18 12:00:00,2026-06-18,PRD-ANACHK000001,CLI-ANA000000001,Purchase,Food,abc,USD,,POS,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-BAD-PARTITION,2026-06-17 23:00:00,2026-06-17,PRD-ANACHK000001,CLI-ANA000000001,Purchase,Food,5.00,USD,,POS,,,,México,Ciudad de México,Approved,00,False,,,
+TRX-T01,2026-06-16 20:00:00,2026-06-18,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Food,50.00,USD,,POS,,Tacos El Güero,Restaurants,Mexico,Ciudad de México,Approved,00,False,2.1,19.4,-99.1

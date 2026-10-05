@@ -1,0 +1,4 @@
+﻿transaction_id,transaction_date,process_date,product_id,customer_id,transaction_type,transaction_category,amount,currency,amount_usd,channel,branch_id,merchant_name,merchant_category,transaction_country,transaction_city,transaction_status,response_code,is_fraud,fraud_score,latitude,longitude
+TRX-T07,2026-05-25 10:00:00,2026-05-25,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Health,80.00,USD,,POS,,Farmacia,Health,México,Ciudad de México,Approved,00,False,1.2,19.41,-99.15
+TRX-T17,2026-05-25 09:00:00,2026-05-25,PRD-ANACC0000003,CLI-ANA000000001,Purchase,Shopping,25.00,USD,,Web,,Tienda Online,Shopping,México,Ciudad de México,Reversed,00,False,,,
+TRX-T18,2026-05-25 11:00:00,2026-05-25,PRD-BRUCHK000001,CLI-BRUNO0000002,Deposit,,100000.00,COP,25.00,Branch,SUC-T0000001,,,Colombia,Bogotá,Approved,00,False,,,

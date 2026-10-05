@@ -20,8 +20,8 @@ services:
       timeout: 5s
       retries: 20
 
-  # Aplica as migrações e carrega os CSVs de ./data. Idempotente: se os dados já estão no banco,
-  # só confere e sai. Para recarregar: docker compose run --rm etl sh -c "node dist/etl/cli.js --force"
+  # Aplica as migrações e carrega os CSVs de ./data. Incremental: só recarrega arquivos que mudaram
+  # (sha256 em etl_files), então pode rodar todo dia. Para recarregar: docker compose run --rm etl sh -c "node dist/etl/cli.js --force"
   etl:
     build: ./backend
     command: ["sh", "-c", "npx prisma migrate deploy && node dist/etl/cli.js"]
