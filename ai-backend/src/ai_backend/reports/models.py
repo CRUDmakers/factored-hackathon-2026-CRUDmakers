@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -27,6 +27,8 @@ ReportLang = Literal["es", "pt"]
 MAX_STATEMENT_ROWS = 500
 # Without dates, a statement covers this many days up to today.
 DEFAULT_STATEMENT_DAYS = 30
+# Argument values that stand for "not given" (see ReportArgs._drop_placeholders).
+PLACEHOLDERS = frozenset({"", "PRD-", "TRX-", "null", "None"})
 
 
 class ReportArgs(BaseModel):
@@ -62,6 +64,18 @@ class ReportArgs(BaseModel):
         default=None,
         description="transaction_receipt: the TRX-… id from search_transactions.",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_placeholders(cls, data: Any) -> Any:
+        """Some gateways make every parameter required, and the model then fills the unused
+        ones with placeholders ("", "PRD-", "TRX-"). Those mean "left out", not an id."""
+        if not isinstance(data, dict):
+            return data
+        return {
+            k: None if isinstance(v, str) and v.strip() in PLACEHOLDERS else v
+            for k, v in data.items()
+        }
 
     @model_validator(mode="after")
     def _consistent(self) -> ReportArgs:

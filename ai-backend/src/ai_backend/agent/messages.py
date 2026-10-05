@@ -42,11 +42,11 @@ _BY_LANGUAGE: dict[str, dict[str, str]] = {
     },
     "out_of_scope": {
         "es": "Eso no lo puedo resolver por aquí. Te puedo ayudar con saldos, movimientos, "
-        "estado de pagos, transferencias y pago de cuentas; para lo demás, comunícate con el "
-        "banco por sus canales oficiales.",
+        "estado de pagos, transferencias, pago de cuentas, extractos y comprobantes en PDF y "
+        "planillas de Excel; para lo demás, comunícate con el banco por sus canales oficiales.",
         "pt": "Isso eu não consigo resolver por aqui. Posso ajudar com saldos, extrato, status "
-        "de pagamentos, transferências e pagamento de contas; para o resto, fale com o banco "
-        "pelos canais oficiais.",
+        "de pagamentos, transferências, pagamento de contas, extratos e comprovantes em PDF e "
+        "planilhas de Excel; para o resto, fale com o banco pelos canais oficiais.",
     },
     "bank_refused_execution": {
         "es": "El banco no aceptó la operación al ejecutarla. No se movió dinero.",

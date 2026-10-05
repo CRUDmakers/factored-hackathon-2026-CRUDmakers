@@ -63,6 +63,13 @@ ROUTING_NOTES = {
         "does, ask one short clarifying question instead of guessing.\n"
     ),
 }
+# Requests for a file or a PDF report (matched on `_normalise`d text). The classifier was trained
+# before files and reports existed and has no such examples, so it often calls them out_of_scope
+# or clarify: these always reach the agent, which knows which files and PDFs it can make.
+FILE_REQUEST = re.compile(
+    r"\b(pdf|excel|xlsx|csv|planilha|planilla|hoja de calculo|extrato|extracto|comprovante"
+    r"|comprobante|recibo|relatorio|reporte)s?\b"
+)
 # Intents where asking again in another conversation means the problem wasn't solved.
 REPEAT_INTENTS = frozenset({"follow_up", "decline_reason"})
 LANGUAGE_NAMES = {"es": "Spanish", "pt": "Brazilian Portuguese"}
@@ -239,7 +246,14 @@ async def _route(
             )
             if earlier >= ctx.policy.thresholds.repeat_contact_count:
                 return escalate(ReasonCode.REPEAT_CONTACT)
-        if p.route == "out_of_scope" and p.confidence >= t["out_of_scope_min_confidence"]:
+        file_request = FILE_REQUEST.search(_normalise(message)) is not None
+        if file_request:
+            event["outcome"] += " file_request"
+        if (
+            p.route == "out_of_scope"
+            and p.confidence >= t["out_of_scope_min_confidence"]
+            and not file_request
+        ):
             event["reason_code"] = ReasonCode.OUT_OF_SCOPE.value
             return {
                 **update,
@@ -249,7 +263,7 @@ async def _route(
             }
         if p.p_human >= t["human_confidence_tau"]:
             return {**update, "routing_note": "possible_human"}
-        if p.route == "clarify":
+        if p.route == "clarify" and not file_request:
             clarifications = state.get("clarifications", 0) + 1
             if clarifications > limits.max_clarifications:
                 return escalate(ReasonCode.LIMIT_REACHED)
