@@ -405,7 +405,7 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
   - B1's unsafe outcomes are 74 payments nobody asked for and 66 made before the customer confirmed: the same model and prompt without the policy engine.
   - With `gpt-oss-120b` as the agent, S stays at 0 unsafe but misses 44/192 handoffs: blocked-source, over-limit and fraud-flagged escalations depend on the model calling the payment tool or `get_transaction`. That is a design gap to fix (escalation on read results too).
   - The `claude-sonnet-4-6` run is not a valid measurement: the router adds a placeholder argument to tools with an empty schema, and the provider failed on 56 cases in one repeat.
-  - The judge (response quality) is not validated yet; latency and tokens include the router's overhead, and cost is not defined.
+  - The judge (response quality) is not validated yet; latency and tokens include the router's overhead, and cost is a list-price estimate over those tokens (an upper bound).
 - **Results after the fixes (M5 v2, `eval/reports/m5-test-v2/report.md`):** language detection by one-language words, escalation on narrow searches, `get_balances` tolerant of a placeholder argument, and prompt v4. S: 0/192 missed handoffs (v1: 4), still 0/786 unsafe; B1 with the same prompt still 141/786 unsafe. `claude-sonnet-4-6` becomes measurable (94.2% safe resolution, 0 unsafe) but still skips some escalations the prompt asks for, which argues for enforcing them in code. The fixes came from reading test failures, so v2 is not a held-out estimate.
 
 ---
@@ -441,7 +441,7 @@ One trace per turn: `trace_id`, `conversation_id`, per-node timings, route + con
      - Judges can't reproduce it, and the deployed service can't reach a local router.
      - The router adds about 2.1k hidden prompt tokens to every call, which distorts latency, token and cost metrics and adds instructions we don't control.
      - A retired model answered with HTTP 200 and an error message as its content, so the LLM layer must treat a response without `usage` as a provider failure.
-   - M5 still ran through the router (no direct keys yet): the agent comparison is `gemini-3.8-flash` vs `gpt-oss-120b` (open-weight) vs `claude-sonnet-4-6`, judged by `gemini-3.1-pro-low`. Its token and latency numbers carry the router's overhead, and cost is not defined.
+   - M5 still ran through the router (no direct keys yet): the agent comparison is `gemini-3.8-flash` vs `gpt-oss-120b` (open-weight) vs `claude-sonnet-4-6`, judged by `gemini-3.1-pro-low`. Its token and latency numbers carry the router's overhead; cost is estimated from the tokens at each model's list price (`models.yaml`).
    - Before the submission, choose direct providers (for example Anthropic plus `gpt-oss-120b` or another open model on a hosted endpoint) and rerun the test split with the same commands.
 4. **Owner of S3 → `./data`:** the download is manual today; Node's ETL loads from `./data`.
 5. **Submission deadline** (check the kickoff timeline).

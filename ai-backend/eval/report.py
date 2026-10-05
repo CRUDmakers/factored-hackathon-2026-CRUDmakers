@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ai_backend.config import ModelSpec, load_model_registry
 from eval.grading import CaseResult
 from eval.metrics import across_repeats, breakdown, by, summarise
 
@@ -42,6 +43,22 @@ def _spread(r: dict[str, Any]) -> str:
     return f"{r['mean']:.1%} ± {r['std']:.1%}"
 
 
+def _agent_spec(system: str, meta: dict[str, Any]) -> ModelSpec | None:
+    """The agent model a system ran on, for cost: `S@<key>` names it, the others ran on the
+    run's default agent model (matched by the provider's model name). B0 calls no model."""
+    models = load_model_registry(Path(__file__).resolve().parents[1] / "config" / "models.yaml")
+    if "@" in system:
+        return models.models.get(system.split("@", 1)[1])
+    return next((m for m in models.models.values() if m.model == meta["agent_model"]), None)
+
+
+def _cost(summary: dict[str, Any]) -> str:
+    def usd(v: float | None) -> str:
+        return "not defined" if v is None else f"${v:.4f}"
+
+    return f"{usd(summary['cost_per_case_usd'])} / {usd(summary['cost_per_resolution_usd'])}"
+
+
 def write_report(
     results: list[CaseResult],
     out_dir: Path,
@@ -53,7 +70,7 @@ def write_report(
     systems = by(results, lambda c: c.system)
     metrics = {
         name: {
-            "summary": summarise(cases),
+            "summary": summarise(cases, _agent_spec(name, meta)),
             "across_repeats": {k: across_repeats(cases, k) for k, _ in HEADLINE},
             "by_language": breakdown(cases, "language"),
             "by_category": breakdown(cases, "category"),
@@ -163,7 +180,9 @@ def render(
             for n in names
         )
         + " |",
-        "| Cost per case / per resolution | " + " | ".join("not defined | " for _ in names) + " |",
+        "| Cost per case / per resolution (USD, list-price estimate, see note) | "
+        + " | ".join(f"{_cost(metrics[n]['summary'])} | " for n in names)
+        + " |",
         "",
         "Definitions (SPEC §11.3): *in-scope* = normal, ambiguous and multilingual cases the system should resolve itself; "
         "*safe automated resolution* = an in-scope case that passed every check, without a handoff and without an unsafe outcome; "
@@ -218,7 +237,7 @@ def render(
         "## Notes and limitations",
         "",
         "- **Latency is not representative.** The development model runs through a local router that adds a hidden ~2.1k-token prompt to every call; the numbers are recorded for completeness only.",
-        "- **Cost is not defined**: the development models have no price per token (`models.yaml`). Token counts are reported instead (they include the router's hidden prompt).",
+        "- **Cost is an estimate, not a bill.** The eval ran through a router at no charge to us, so cost = measured tokens × the model's public list price in `models.yaml` (`gemini-3.8-flash` $1.50 / $7.50 per million input / output tokens, the Gemini API standard rate; the introductory rate until 2026-12-31 is half that. `claude-sonnet-4-6` $3 / $15, Anthropic API). Per case = total ÷ all cases; per resolution = total ÷ safe automated resolutions. It is an upper bound: the tokens include the router's hidden ~2.1k-token prompt on every call, and the runs don't record cache hits, so all input is priced uncached. B0 calls no model, so its cost is $0.",
         "- Scenarios are generated from the synthetic dataset's records with hand-written ES/PT templates; they measure behaviour on those templates, not on real customer traffic.",
         "- Grading is deterministic (outcomes, reason codes, tool calls, payments at the bank, required and forbidden text). Text checks are substring-based and can miss a correct answer phrased unexpectedly; the error analysis lists every failure so they can be reviewed.",
     ]

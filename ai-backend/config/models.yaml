@@ -1,24 +1,26 @@
 # Model registry. AGENT_MODEL / JUDGE_MODEL pick entries by key.
-# price_per_mtok is USD per million tokens; null until copied from the provider's pricing page.
+# price_per_mtok is USD per million tokens, list prices checked 2026-10-05 (Anthropic API pricing;
+# Gemini API standard rate, the introductory rate until 2026-12-31 is half). null = no published price.
+# The router models are free for us; these prices turn the measured tokens into a list-price estimate.
 # Effort/thinking params: verify how langchain-anthropic passes them before adding (M1).
 models:
   claude-opus-5-5:
     provider: anthropic
     model: claude-opus-5-5
     params: {max_tokens: 4096}
-    price_per_mtok: null
+    price_per_mtok: {input: 4.00, output: 20.00, cache_read: 0.20}
     capabilities: [tools, prompt_caching]
   claude-sonnet-5:
     provider: anthropic
     model: claude-sonnet-5
     params: {max_tokens: 4096}
-    price_per_mtok: null
+    price_per_mtok: {input: 2.00, output: 10.00}
     capabilities: [tools, prompt_caching]
   claude-haiku-4-5:
     provider: anthropic
     model: claude-haiku-4-5
     params: {max_tokens: 4096}
-    price_per_mtok: null
+    price_per_mtok: {input: 1.00, output: 5.00}
     capabilities: [tools, prompt_caching]
   # Development: Gemini through a local 9router (OpenAI-compatible, OPENAI_COMPAT_BASE_URL).
   # Checked 2026-09-28: tool calling works; temperature 0 is accepted; the router adds ~2.1k
@@ -28,7 +30,7 @@ models:
     provider: openai_compatible
     model: ag/gemini-3.8-flash
     params: {max_tokens: 4096, temperature: 0}
-    price_per_mtok: null
+    price_per_mtok: {input: 1.50, output: 7.50}
     capabilities: [tools]
   gemini-3.1-pro-low:
     provider: openai_compatible
@@ -48,13 +50,14 @@ models:
     provider: openai_compatible
     model: ag/gpt-oss-120b-medium
     params: {max_tokens: 4096, temperature: 0}
-    price_per_mtok: null
+    # Open weights, so the price depends on the host ($0.03–0.15 input); Groq's, the top of the range.
+    price_per_mtok: {input: 0.15, output: 0.75}
     capabilities: [tools]
   claude-sonnet-4-6:
     provider: openai_compatible
     model: ag/claude-sonnet-4-6
     params: {max_tokens: 4096, temperature: 0}
-    price_per_mtok: null
+    price_per_mtok: {input: 3.00, output: 15.00}
     capabilities: [tools]
   # Open model for the deployment: provider and model name are open decision #4 (ARCHITECTURE §16).
   # open-model-1:

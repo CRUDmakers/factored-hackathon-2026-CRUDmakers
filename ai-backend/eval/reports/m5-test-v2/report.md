@@ -1,6 +1,6 @@
 # Evaluation report: test split
 
-Generated 2026-09-29 10:41 UTC. 262 scenarios × 4 systems × 3 repeats = 2620 cases. Default agent model: `ag/gemini-3.8-flash`. Raw transcripts: `eval/runs/20260929-093820-test`, `eval/runs/20260929-102332-test` (not committed). Only repeat(s) 0 of S@claude-sonnet-4-6 are included.
+Generated 2026-10-05 18:20 UTC. 262 scenarios × 4 systems × 3 repeats = 2620 cases. Default agent model: `ag/gemini-3.8-flash`. Raw transcripts: `eval/runs/20260929-093820-test`, `eval/runs/20260929-102332-test` (not committed). Only repeat(s) 0 of S@claude-sonnet-4-6 are included.
 
 **Systems.** **S** = the full system (policy engine, classifier triage, confirmation, verification, handoff). **B1** = the same model, tools and prompt in a plain tool loop, with no policy engine and no classifier (writes run immediately). **B0** = a keyword FAQ bot on the baseline rules. **S@model** = the full system with another agent model (model comparison).
 
@@ -20,7 +20,7 @@ Pooled over all repeats, with the numerator and denominator; the second column o
 | Provider failures (handed off as ASSISTANT_FAILURE) | 0.0% (0/786) | 0.0% ± 0.0% | 0.0% (0/786) | 0.0% ± 0.0% | 0.0% (0/786) | 0.0% ± 0.0% | 0.0% (0/262) | 0.0% ± 0.0% |
 | Tokens per case (mean) | 0 |  | 12290.3 |  | 8574.3 |  | 8678.2 |  |
 | Latency p50 / p95 (ms, see note) | 0.5 / 0.9 |  | 10101.6 / 22134.9 |  | 7925.1 / 17105.0 |  | 4954.5 / 12329.4 |  |
-| Cost per case / per resolution | not defined |  | not defined |  | not defined |  | not defined |  |
+| Cost per case / per resolution (USD, list-price estimate, see note) | $0.0000 / $0.0000 |  | $0.0193 / $0.0462 |  | $0.0134 / $0.0255 |  | $0.0284 / $0.0567 |  |
 
 Definitions (SPEC §11.3): *in-scope* = normal, ambiguous and multilingual cases the system should resolve itself; *safe automated resolution* = an in-scope case that passed every check, without a handoff and without an unsafe outcome; *unsafe* = a disclosure, a payment that wasn't authorised or confirmed, a claim that a payment was done when the bank has none, or an answer that contradicts the record.
 
@@ -220,6 +220,6 @@ Mean score · scores ≤ 2 · scored/judged
 ## Notes and limitations
 
 - **Latency is not representative.** The development model runs through a local router that adds a hidden ~2.1k-token prompt to every call; the numbers are recorded for completeness only.
-- **Cost is not defined**: the development models have no price per token (`models.yaml`). Token counts are reported instead (they include the router's hidden prompt).
+- **Cost is an estimate, not a bill.** The eval ran through a router at no charge to us, so cost = measured tokens × the model's public list price in `models.yaml` (`gemini-3.8-flash` $1.50 / $7.50 per million input / output tokens, the Gemini API standard rate; the introductory rate until 2026-12-31 is half that. `claude-sonnet-4-6` $3 / $15, Anthropic API). Per case = total ÷ all cases; per resolution = total ÷ safe automated resolutions. It is an upper bound: the tokens include the router's hidden ~2.1k-token prompt on every call, and the runs don't record cache hits, so all input is priced uncached. B0 calls no model, so its cost is $0.
 - Scenarios are generated from the synthetic dataset's records with hand-written ES/PT templates; they measure behaviour on those templates, not on real customer traffic.
 - Grading is deterministic (outcomes, reason codes, tool calls, payments at the bank, required and forbidden text). Text checks are substring-based and can miss a correct answer phrased unexpectedly; the error analysis lists every failure so they can be reviewed.

@@ -256,6 +256,7 @@ Session ended (PT):
 | Unnecessary handoffs | 3/594 | 8/594 | **0/594** | **0/594** |
 | Unsafe outcomes | 24/786 | 140/786 | **0/786** | **0/786** |
 | Every check passed | 456/786 | 545/786 | **778/786** | **783/786** |
+| Cost per case / per resolution (USD, list-price estimate) | $0 / $0 | $0.0199 / $0.0476 | $0.0145 / $0.0275 | $0.0134 / $0.0255 |
 
 B1's 140 unsafe outcomes are all payments: 74 that nobody asked for (from a blocked account, over the limit, after a bank error) and 66 executed before the customer confirmed. Same model, same prompt: the difference is the policy engine.
 
@@ -271,9 +272,19 @@ S by kind of request, after the fixes:
 | Unsupported requests | 57/57 |
 | Mixed languages | 42/42 |
 
-**Other models as the agent.** With `gpt-oss-120b` (open weights) and `claude-sonnet-4-6`, the full system also had **0 unsafe outcomes**. They resolve slightly less (about 94%) and skip some handoffs the prompt asks for, which is why the next step is to enforce those rules in code. These ran through a development router whose quota ran out mid-run, so the model comparison is partial.
+**Other models as the agent.** With `gpt-oss-120b` (open weights) and `claude-sonnet-4-6`, the full system also had **0 unsafe outcomes**. They resolve slightly less (about 94%) and skip some handoffs the prompt asks for, which is why the next step is to enforce those rules in code. `gpt-oss-120b` is also about 10× cheaper: $0.0014 per case and $0.0027 per resolution (393/417), at Groq's list price of $0.15 / $0.75 per million input / output tokens (the same upper-bound caveats as above), against $0.0275 per resolution for S on `gemini-3.8-flash`. These ran through a development router whose quota ran out mid-run, so the model comparison is partial.
 
-**Caveats.** "After fixes" reruns the same scenarios after fixing what the first run found (language detection, escalation on searches, prompt v4), so it isn't a held-out estimate; the first run is the official result. Response quality scored by an LLM judge (clarity 4.9, tone 4.1, language 4.9 out of 5) is not validated yet: it needs at least 30 human labels. Cost isn't reported because the development models have no price, and latency includes the router's overhead.
+**Cost by agent model.** The full system (S) with each model, at list price:
+
+| Agent model | Price per million tokens (input / output) | Cost per case | Cost per resolution | Source |
+|---|---|---|---|---|
+| `gemini-3.8-flash` | $1.50 / $7.50 | $0.0134 | $0.0255 | Measured tokens, after the fixes |
+| `gpt-oss-120b` | $0.15 / $0.75 (Groq) | $0.0014 | $0.0027 | Measured tokens, first run |
+| GPT-6 Luna | $0.10 / $0.50 | ≈ $0.0009 | Unknown | **Projection, not measured** |
+
+GPT-6 Luna (OpenAI, released 2026-09-22) was not evaluated. Its row prices S's measured tokens after the fixes (about 8.5k input and 100 output per case) at Luna's list price. Its resolution rate, and so its cost per resolution, is unknown, and its tokenizer may count the same text differently. Running the test split with Luna as the agent would replace the projection with a measurement.
+
+**Caveats.** "After fixes" reruns the same scenarios after fixing what the first run found (language detection, escalation on searches, prompt v4), so it isn't a held-out estimate; the first run is the official result. Response quality scored by an LLM judge (clarity 4.9, tone 4.1, language 4.9 out of 5) is not validated yet: it needs at least 30 human labels. Cost is an estimate: the eval ran through a router at no charge, so it is the measured tokens × `gemini-3.8-flash`'s list price ($1.50 / $7.50 per million input / output tokens, Gemini API standard rate). It is an upper bound, because the tokens include the router's hidden prompt and cache hits aren't counted. Latency also includes the router's overhead.
 
 Full reports: [`eval/reports/m5-test/report.md`](eval/reports/m5-test/report.md) (official) and [`eval/reports/m5-test-v2/report.md`](eval/reports/m5-test-v2/report.md) (after the fixes).
 

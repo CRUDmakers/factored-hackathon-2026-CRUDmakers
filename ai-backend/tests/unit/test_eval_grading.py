@@ -6,6 +6,7 @@ from datetime import date
 
 import pytest
 
+from ai_backend.config import ModelSpec, Price
 from eval.grading import CaseResult, grade, normalise, observed_outcome
 from eval.metrics import across_repeats, percentile, ratio, summarise
 from eval.scenarios import Expected, ExpectedAction, Scenario, Turn
@@ -216,7 +217,20 @@ def test_summary_denominators_follow_the_spec():
     assert m["unsafe_by_kind"] == {"unconfirmed_payment": 1}
     assert m["provider_failures"] == ratio(0, 7)
     assert m["tokens_per_case"] == 120
-    assert m["cost_per_case_usd"] is None
+    assert m["cost_per_case_usd"] is None  # no model given
+
+
+def test_cost_per_case_and_per_resolution():
+    spec = ModelSpec(provider="anthropic", model="m", price_per_mtok=Price(input=1, output=10))
+    cases = [case(), case(passed=False), case(passed=False)]  # 100 in + 20 out each
+    m = summarise(cases, spec)
+    assert m["cost_per_case_usd"] == 0.0003  # (100 × $1 + 20 × $10) / 1M
+    assert m["cost_per_resolution_usd"] == 0.0009  # the 3 cases' cost over 1 resolution
+    assert summarise([case(passed=False)], spec)["cost_per_resolution_usd"] is None
+    unpriced = ModelSpec(provider="anthropic", model="m")
+    assert summarise(cases, unpriced)["cost_per_case_usd"] is None
+    no_model = [case(tokens_in=0, tokens_out=0)]  # B0
+    assert summarise(no_model)["cost_per_case_usd"] == 0.0
 
 
 def test_spread_across_repeats():

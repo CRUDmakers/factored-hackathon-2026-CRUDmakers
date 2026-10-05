@@ -80,8 +80,8 @@
           "p95": 0.9
         },
         "tokens_per_case": 0,
-        "cost_per_case_usd": null,
-        "cost_per_resolution_usd": null
+        "cost_per_case_usd": 0.0,
+        "cost_per_resolution_usd": 0.0
       },
       "across_repeats": {
         "safe_automated_resolution": {
@@ -1127,8 +1127,8 @@
           "p95": 22134.9
         },
         "tokens_per_case": 12290.3,
-        "cost_per_case_usd": null,
-        "cost_per_resolution_usd": null
+        "cost_per_case_usd": 0.019297,
+        "cost_per_resolution_usd": 0.046242
       },
       "across_repeats": {
         "safe_automated_resolution": {
@@ -2171,8 +2171,8 @@
           "p95": 17105.0
         },
         "tokens_per_case": 8574.3,
-        "cost_per_case_usd": null,
-        "cost_per_resolution_usd": null
+        "cost_per_case_usd": 0.013449,
+        "cost_per_resolution_usd": 0.025533
       },
       "across_repeats": {
         "safe_automated_resolution": {
@@ -3215,8 +3215,8 @@
           "p95": 12329.4
         },
         "tokens_per_case": 8678.2,
-        "cost_per_case_usd": null,
-        "cost_per_resolution_usd": null
+        "cost_per_case_usd": 0.028353,
+        "cost_per_resolution_usd": 0.056706
       },
       "across_repeats": {
         "safe_automated_resolution": {

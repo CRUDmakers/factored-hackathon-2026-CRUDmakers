@@ -6,8 +6,11 @@ from __future__ import annotations
 import statistics
 from collections import defaultdict
 from collections.abc import Callable, Iterable
+from decimal import Decimal
 from typing import Any
 
+from ai_backend.config import ModelSpec
+from ai_backend.llm.pricing import cost_usd
 from eval.grading import CaseResult
 
 
@@ -24,8 +27,23 @@ def percentile(values: list[float], q: float) -> float | None:
     return round(ordered[lo] + (ordered[hi] - ordered[lo]) * (k - lo), 1)
 
 
-def summarise(cases: list[CaseResult]) -> dict[str, Any]:
-    """All §11.3 metrics for one set of cases (one system, one or more repeats)."""
+def total_cost_usd(cases: list[CaseResult], spec: ModelSpec | None) -> Decimal | None:
+    """List-price cost of the cases' tokens. No tokens (B0, no model) → 0; no price → None.
+    The runs don't record cached tokens, so all input is priced uncached (an upper bound)."""
+    if not any(c.tokens_in or c.tokens_out for c in cases):
+        return Decimal(0)
+    if spec is None or spec.price_per_mtok is None:
+        return None
+    return sum((cost_usd(spec, c.tokens_in, c.tokens_out) or Decimal(0) for c in cases), Decimal(0))
+
+
+def _per(total: Decimal | None, n: int) -> float | None:
+    return round(float(total / n), 6) if total is not None and n else None
+
+
+def summarise(cases: list[CaseResult], spec: ModelSpec | None = None) -> dict[str, Any]:
+    """All §11.3 metrics for one set of cases (one system, one or more repeats). `spec` is the
+    agent model, for cost."""
     in_scope = [c for c in cases if c.in_scope]
     human = [c for c in cases if c.needs_human]
     not_human = [c for c in cases if not c.needs_human]
@@ -37,6 +55,7 @@ def summarise(cases: list[CaseResult]) -> dict[str, Any]:
     latencies = [c.latency_ms for c in cases if c.latency_ms]
     tokens = [c.tokens_in + c.tokens_out for c in cases]
     resolved = [c for c in in_scope if c.passed and not c.handed_off and not c.unsafe]
+    cost = total_cost_usd(cases, spec)
     return {
         "cases": len(cases),
         "passed": ratio(sum(c.passed for c in cases), len(cases)),
@@ -58,9 +77,10 @@ def summarise(cases: list[CaseResult]) -> dict[str, Any]:
         "unsafe_by_kind": dict(sorted(kinds.items())),
         "latency_ms": {"p50": percentile(latencies, 0.5), "p95": percentile(latencies, 0.95)},
         "tokens_per_case": round(statistics.mean(tokens), 1) if tokens else None,
-        # No price for the development models (models.yaml price_per_mtok: null).
-        "cost_per_case_usd": None,
-        "cost_per_resolution_usd": None,
+        # Per case = total ÷ all cases; per resolution = total ÷ safe automated resolutions
+        # (None, "not defined", when there are none or the model has no price).
+        "cost_per_case_usd": _per(cost, len(cases)),
+        "cost_per_resolution_usd": _per(cost, len(resolved)),
     }
 
 
