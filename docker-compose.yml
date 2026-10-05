@@ -64,14 +64,15 @@ services:
     profiles: ["test"]
 
   # Internet banking de demonstração (Vite + React servido por nginx): http://localhost:${FRONTEND_PORT}
-  # As VITE_* entram no bundle no build e são usadas pelo NAVEGADOR (por isso localhost:<porta do host>).
+  # O nginx do frontend faz proxy de /api -> api e /ai -> ai-backend, então o bundle usa caminhos
+  # relativos e funciona acessando de qualquer máquina (http://<ip-do-servidor>:${FRONTEND_PORT}).
   frontend:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: http://localhost:${API_PORT:-11101}
+        VITE_API_URL: /api
         VITE_SERVICE_KEY: ${AUTH_SERVICE_KEY:?defina AUTH_SERVICE_KEY no .env}
-        VITE_AI_URL: http://localhost:${AI_PORT:-11103}
+        VITE_AI_URL: /ai
     ports:
       - "${FRONTEND_PORT:-11102}:80"
     depends_on:

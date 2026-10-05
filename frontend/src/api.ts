@@ -70,7 +70,7 @@ export function getSession() {
 type Query = Record<string, string | number | boolean | undefined | null>;
 
 function buildUrl(path: string, query?: Query, base = API_URL) {
-  const url = new URL(base + path);
+  const url = new URL(base + path, window.location.origin);
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, String(v));
   }
